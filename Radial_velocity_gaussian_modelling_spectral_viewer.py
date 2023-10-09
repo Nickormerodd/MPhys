@@ -236,8 +236,6 @@ def filter_data(data, val_1, val_2):
 
 def velocity_func(f_obs, name):
     
-    #name = (((name.replace('$', '')).replace('{','')).replace('}','')).replace
-    
     f_rest = float(input('What is the rest frequency in GHz for '+str(name)+'\n'))
     velocity = -c*(f_rest-f_obs)/f_rest
     print('v_radial_'+ str(name) + ' = ' + str(velocity*10**(-3)) + ' km/s')
@@ -250,8 +248,7 @@ def final_velocity(data):
     data[:,0] = data[:,0]*10**(-3)
     if len(data[:,0]) > 1:
         for line in data:
-            print('velocity_'+str(((line[1])))#.replace('$', '')).replace('{','')).replace('}',''))
-                  +' = ' + str(line[0].replace) + ' km/s')
+            print('velocity_'+str(((line[1]))) +' = ' + str(line[0]) + ' km/s')
             
         mean_v = np.mean(data[:,0])
         std_dev_v = np.std(data[:,0])
