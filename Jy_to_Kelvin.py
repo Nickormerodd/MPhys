@@ -35,10 +35,7 @@ def get_data():
     return
 
 def main(data, filename, path):
-    
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    
+
     header = data[0].header
     ref_freq = header['CRVAL3'] #reference frequency
     incr_freq = header['CDELT3'] #frequency increment
@@ -55,17 +52,6 @@ def main(data, filename, path):
     for i in range(num_channels):
         equiv = u.brightness_temperature(frequencies[i])
         data[0].data[i] = (data[0].data[i]*u.Jy/beam_size).to(u.K,equivalencies=equiv)
-    
-    m = data[0].shape[1]
-    p = data[0].shape[2]
-
-    x = np.linspace(0, p - 1, p)
-    y = np.linspace(0, m - 1, m)
-    X, Y = np.meshgrid(x, y)
-    
-    contourf = ax.contourf(X, Y, data[0].data[0] , cmap='magma',
-                           levels = 30) # 'viridis')
-    plt.colorbar(contourf, label='Brightness Temperature, K')
 
     new_filename = os.path.basename(path).replace('.fits','_kelvin.fits') 
     print(new_filename)
