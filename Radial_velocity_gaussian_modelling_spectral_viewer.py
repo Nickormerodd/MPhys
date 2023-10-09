@@ -214,7 +214,7 @@ def gaus_fitting(data):
         try:
             params, covariance = curve_fit(gaussian, data[:,2], data[:,1],
                                            p0=GUESS, absolute_sigma=True,
-                                           maxfev=1000)
+                                           maxfev=2000)
         except ValueError or RuntimeWarning:
             break
         GUESS = params
