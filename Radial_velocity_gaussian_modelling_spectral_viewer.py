@@ -55,6 +55,7 @@ def get_data():
 
 def main(data, filename, path, vel, spectral, n):
     print('\nFile = ' + str(filename))
+    print('Number of channels = ' + str(data[0].shape[0]))
     
     header = data[0].header
     ref_freq = header['CRVAL3'] #reference frequency
@@ -95,7 +96,7 @@ def main(data, filename, path, vel, spectral, n):
 
 def answers(spectral):
     
-    val_str = input('Range of channel numbers, e.g., in format 100-120:\n')
+    val_str = input('Range of channel numbers, e.g. in format 100-120:\n')
     val_list = val_str.split('-')
 
     if len(val_list) == 2:
@@ -105,7 +106,7 @@ def answers(spectral):
         print("Invalid input format. Please use the format 'start-end'.")
         
     print('Range = {}-{}'.format(val_1,val_2))
-    molecule_name = input('Name of Molecule:\n')
+    molecule_name = input('Name of Molecule (in latex):\n')
     print('Name of molecule = {}'.format(molecule_name))
     line_data = filter_data(spectral, val_1, val_2)
     line_data_gaus, params, covariance = gaus_fitting(line_data)
@@ -235,6 +236,8 @@ def filter_data(data, val_1, val_2):
 
 def velocity_func(f_obs, name):
     
+    #name = (((name.replace('$', '')).replace('{','')).replace('}','')).replace
+    
     f_rest = float(input('What is the rest frequency in GHz for '+str(name)+'\n'))
     velocity = -c*(f_rest-f_obs)/f_rest
     print('v_radial_'+ str(name) + ' = ' + str(velocity*10**(-3)) + ' km/s')
@@ -247,7 +250,8 @@ def final_velocity(data):
     data[:,0] = data[:,0]*10**(-3)
     if len(data[:,0]) > 1:
         for line in data:
-            print('velocity_'+str(line[1])+' = ' + str(line[0]) + ' km/s')
+            print('velocity_'+str(((line[1])))#.replace('$', '')).replace('{','')).replace('}',''))
+                  +' = ' + str(line[0].replace) + ' km/s')
             
         mean_v = np.mean(data[:,0])
         std_dev_v = np.std(data[:,0])
