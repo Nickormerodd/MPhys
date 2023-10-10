@@ -77,7 +77,7 @@ def main(data, filename, path, vel, spectral, n):
             equiv = u.brightness_temperature(frequencies[i])
             data[0].data[i] = (data[0].data[i]*u.Jy/beam_size).to(u.K,equivalencies=equiv)
 
-        max_value = i, np.nanmax(data[0].data[i]), freq[i]
+        max_value = i, np.nanmean(data[0].data[i]), freq[i]
         temp.append(max_value)
     
     if n==0:
