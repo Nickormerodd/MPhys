@@ -17,6 +17,8 @@ This is repeated m times for n files, however many you choose.
 It then prints a final velocity which is calculated from the mean of the 
 velocities, with an uncertainty on the mean velocity equal to the 
 standard deviation of the calculated velocities.
+
+This saves the figure created, so # that off if dont want figure saved.
 """
 import numpy as np
 from astropy.io import fits
@@ -77,12 +79,15 @@ def main(data, filename, path, vel, spectral, n):
             equiv = u.brightness_temperature(frequencies[i])
             data[0].data[i] = (data[0].data[i]*u.Jy/beam_size).to(u.K,equivalencies=equiv)
 
-        max_value = i, np.nanmean(data[0].data[i]), freq[i]
+        max_value = np.nanmean(data[0].data[i]), freq[i]
         temp.append(max_value)
     
     if n==0:
-        spectral = np.vstack(temp)
+        channel_no = np.linspace(0,num_channels-1,num_channels)
+        spectral = np.hstack((np.vstack((channel_no)),np.vstack((temp))))
+        #print(spectral)
         spectrum(spectral, filename)
+    
     
     if not n==0:
         again = input('Anymore ranges in this file? [y/n]\n')
@@ -119,7 +124,7 @@ def answers(spectral):
         velocity = np.nan
     
     return velocity, molecule_name
-
+"""
 def spectrum(data, filename):
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -130,34 +135,58 @@ def spectrum(data, filename):
     ax.set_ylabel('Brightness temperature, K')
     
     ax2 = ax.twiny()
-    data[:, 0] = data[::-1, 0]
-    ax2.scatter(data[:,0], data[:,1], s=0, color='green')
+    #data[:, 0] = data[::-1, 0]
+    ax2.scatter(data[:, 0], data[:,1], s=2, color='green')
     ax2.tick_params(axis='x')
     ax2.set_xlabel('Channel number')
     ax.grid(True, linewidth=0.5, alpha=0.7)
 
     return
+"""
 
-def line_graph(data, gaus, params, name, covariance):
-    """
-    """
+
+def spectrum(data, filename):
     fig = plt.figure()
     ax = fig.add_subplot(111)
     
-    ax.errorbar(data[:,2], data[:,1], linewidth = 1, 
-                label='{} line'.format(name), fmt='x')
-    ax.set_title(name)
+    ax.plot(data[:,2], data[:,1], linewidth=1)
+    ax.set_title(filename)
     ax.set_xlabel('Frequency, GHz')
     ax.set_ylabel('Brightness temperature, K')
     ax.tick_params(axis='x', labelsize=9)
     ax.tick_params(axis='y', labelsize=9)
     
     ax2 = ax.twiny()
-    data[:, 0] = data[::-1, 0]
-    ax2.scatter(data[:,0], data[:,1], s=0, color='green')
+    num_ticks_to_display = 6 
+    step_size = len(data[:, 0]) // num_ticks_to_display
+    channel_numbers = data[::step_size, 0][::-1] 
+    ax2.set_xticks(data[::step_size, 0][::-1])
+    ax2.set_xticklabels(channel_numbers.astype(int)[::-1])
     ax2.tick_params(axis='x', labelsize=9)
     ax2.set_xlabel('Channel number')
+    ax2.spines['top'].set_color('none')
     
+    ax.grid(True, linewidth=0.5, alpha=0.7)
+
+    return
+
+def line_graph(data, gaus, params, name, covariance):
+    """
+    data[:,0] = channel number
+    data[:,1] = Brightness temperature
+    data[:,2] = frequency
+    """
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    
+    ax.errorbar(data[:,2], data[:,1], linewidth = 1, 
+                label='Data', fmt='x')
+    ax.set_title(name)
+    ax.set_xlabel('Frequency, GHz')
+    ax.set_ylabel('Brightness temperature, K')
+    ax.tick_params(axis='x', labelsize=9)
+    ax.tick_params(axis='y', labelsize=9)
+
     amp, mean, std_dev = params
     perr = np.sqrt(np.diag(covariance))
     
@@ -194,8 +223,14 @@ def line_graph(data, gaus, params, name, covariance):
     print('Amplitude = ' + str(amp) + r' +/- ' + str(perr[0]) + ' K')
     ax.grid(True, linewidth=0.5, alpha=0.7)
     ax.legend(fontsize=9.5)
-    return
     
+    name = ((name.replace('$','')).replace(' ','')).replace("\\rightarrow","")
+    
+    plt.savefig('Gaussian_'+str(name) + '.png', dpi=1000)
+    
+    return
+
+
 def gaussian(x, amplitude, mean, std_dev):
     
     return amplitude * np.exp(-(x - mean) ** 2 / (2 * std_dev ** 2))
@@ -223,6 +258,7 @@ def gaus_fitting(data):
     amp, mean, std_dev = params
     data[:,1] = data[:,1] + minimum
     data_curve = gaussian(data[:,2],amp,mean,std_dev) + minimum
+    #data_curve = np.hstack((np.vstack((data_curve)),data[:,2]))
     params = (amp+minimum,mean,std_dev)
     return data_curve, params, covariance
 
@@ -261,5 +297,6 @@ def no_nan(data):
         if not np.any(np.isnan(line[0])):
             temp.append(line)
     return np.vstack(temp)
+
 
 get_data()
