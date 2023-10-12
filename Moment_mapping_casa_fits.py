@@ -1,7 +1,7 @@
 """
 Created on Tue Oct 10 15:57:51 2023
 
-@author: Christopher
+@author: Christopher yes bro
 """
 
 import numpy as np
