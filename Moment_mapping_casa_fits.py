@@ -1,7 +1,7 @@
 """
 Created on Tue Oct 10 15:57:51 2023
 
-@author: Christopher yes bro
+@author: Christopher
 """
 
 import numpy as np
@@ -10,6 +10,7 @@ from spectral_cube import SpectralCube as sc
 from tkinter import Tk
 from tkinter import filedialog
 import matplotlib.pyplot as plt
+from scipy.constants import c
 import os
 
 def get_data():
@@ -43,18 +44,25 @@ def main(data, name, path):
     
     name = name.replace("_image","") + ".png"
     print(name)
+    
+    calibration_freq = 220.70908 #GHz
+    
     if '914' in name.lower():
         title = '$CH_{3}CN-J_{K}=12_{2}\\rightarrow11_{2}$'
+        conversion = (c/1000) * (220.73027 - calibration_freq)/calibration_freq
+        data[0].data[0] = data[0].data[0] + conversion
     elif '958' in name.lower():
         title = '$CH_{3}CN-J_{K}=12_{3}\\rightarrow11_{3}$'
     elif '1020' in name.lower():
         title = '$CH_{3}CN-J_{K}=12_{4}\\rightarrow11_{4}$'
+        conversion = (c/1000) * (220.679114 - calibration_freq)/calibration_freq
+        data[0].data[0] = data[0].data[0] + conversion
     elif '1096' in name.lower():
         title = '$CH_{3}CN-J_{K}=12_{5}\\rightarrow11_{5}$'
+        conversion = (c/1000) * (220.64112 - calibration_freq)/calibration_freq
+        data[0].data[0] = data[0].data[0] + conversion
     else:
         title = 'unknown'
-    ref_velocity =  30.02346263833746
-    data[0].data[0] = data[0].data[0] # ref_velocity #- np.nanmean(data[0].data[0])
     
     contourf = ax.contourf(X, Y, data[0].data[0] , cmap='bwr',
                            levels = 50) # 'viridis')
@@ -68,7 +76,7 @@ def main(data, name, path):
     ax.spines['bottom'].set_visible(False)
     ax.spines['left'].set_visible(False)
     
-    #plt.savefig(name, dpi=1000)
+    plt.savefig(name, dpi=1000)
     
     return
 
