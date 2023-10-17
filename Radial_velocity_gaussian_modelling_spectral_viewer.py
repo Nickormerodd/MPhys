@@ -10,7 +10,9 @@ molecule name, and input rest frequency of the molecule.
 This code then models the molecular line peak as a gaussian, and then extracts
 the mean value of the observed frequency of that peak and calculates
 the velocity the source is moving at by comparing with the rest frequency
-inputted.
+inputted. The code also evaluates a realistic uncertainty on the brightness 
+temperature, which is calculated by finding the uncertainty required for the
+reduced chi-square to be within 0.5-1.5.
 
 This is repeated m times for n files, however many you choose.
 
@@ -124,30 +126,10 @@ def answers(spectral):
         velocity = np.nan
     
     return velocity, molecule_name
-"""
-def spectrum(data, filename):
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    
-    ax.plot(data[:,2], data[:,1], linewidth = 1)
-    ax.set_title(filename)
-    ax.set_xlabel('Frequency, GHz')
-    ax.set_ylabel('Brightness temperature, K')
-    
-    ax2 = ax.twiny()
-    #data[:, 0] = data[::-1, 0]
-    ax2.scatter(data[:, 0], data[:,1], s=2, color='green')
-    ax2.tick_params(axis='x')
-    ax2.set_xlabel('Channel number')
-    ax.grid(True, linewidth=0.5, alpha=0.7)
-
-    return
-"""
-
 
 def spectrum(data, filename):
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
+
+    fig, ax = plt.subplots(figsize=(15, 6)) 
     
     ax.plot(data[:,2], data[:,1], linewidth=1)
     ax.set_title(filename)
@@ -167,6 +149,9 @@ def spectrum(data, filename):
     ax2.spines['top'].set_color('none')
     
     ax.grid(True, linewidth=0.5, alpha=0.7)
+    filename = (filename.replace(" ", "_")).replace("image_pbcor_line_galactic_kelvin", "spectrum.png")
+    print(filename)
+    #plt.savefig('')
 
     return
 
@@ -179,7 +164,9 @@ def line_graph(data, gaus, params, name, covariance):
     fig = plt.figure()
     ax = fig.add_subplot(111)
     
-    ax.errorbar(data[:,2], data[:,1], linewidth = 1, 
+    low_uncert, up_uncert, mean_uncert = chi_uncertainty(data, gaus)
+    
+    ax.errorbar(data[:,2], data[:,1], yerr=float(mean_uncert), linewidth = 1, 
                 label='Data', fmt='x')
     ax.set_title(name)
     ax.set_xlabel('Frequency, GHz')
@@ -187,6 +174,7 @@ def line_graph(data, gaus, params, name, covariance):
     ax.tick_params(axis='x', labelsize=9)
     ax.tick_params(axis='y', labelsize=9)
 
+    
     amp, mean, std_dev = params
     perr = np.sqrt(np.diag(covariance))
     
@@ -201,7 +189,9 @@ def line_graph(data, gaus, params, name, covariance):
     
     mean_formatted = '{:.4f}'.format(mean)
     std_formatted = '{:.4f}'.format(std_dev)
-    ax.plot(data[:,2], gaus, color='green')
+    x_gaus = np.linspace(min(data[:,2]), max(data[:,2]), 100)
+    y_gaus = gaussian(x_gaus,amp,mean,std_dev)
+    ax.plot(x_gaus, y_gaus, color='green')
     ax.plot(x_mean,y_mean,color='grey', linewidth=1, linestyle='--',
             label =r'$\bar{\nu}$ = ' + str(mean_formatted) + ' GHz')
 
@@ -210,12 +200,22 @@ def line_graph(data, gaus, params, name, covariance):
                  arrowprops=arrow_props)
     ax.annotate('', xy=(x_std_1[-1], y_std_1[-1]), xytext=(x_std_1[-2], y_std_1[-2]),
                  arrowprops=arrow_props)
-    ax.plot([],[], color='black', label= r'$\sigma$ = ' + str(std_formatted) + ' GHz',
+    ax.plot([],[], color='black', label= r'$\sigma_{std}$ = ' + str(std_formatted) + ' GHz',
             linewidth=1)
-    ax.plot(x_std_2,y_std_2,color='blue',linestyle='--',linewidth=1)
+    ax.plot(x_std_2,y_std_2,color='grey',linestyle='--',linewidth=1)
+    
+    ax.annotate(r'For 0.5$\leq$$\chi^2_{red}$$\leq$1.5 $\Longrightarrow$ ' + str(low_uncert) + '$\leq$$\sigma_{data}$$\leq$' + str(up_uncert),
+                xy=(0.5, 0.5), xytext=(0, -145), 
+                xycoords='axes fraction', textcoords='offset points', fontsize=11,
+                ha='center', va='top')
+    
+    ax.annotate(r'$\therefore$ $\sigma_{data}$ = ' + str(mean_uncert) + ' K',
+                xy=(0.5, 0.5), xytext=(0, -162), 
+                xycoords='axes fraction', textcoords='offset points', fontsize=11,
+                ha='center', va='top')
     
     def format_func(x, _):
-        return '{:.2f}'.format(x)
+        return '{:.3f}'.format(x)
     ax.xaxis.set_major_formatter(FuncFormatter(format_func))
     
     print('\n''Mean_freq = ' + str(mean) + r' +/- ' + str(perr[1]) + ' GHz')
@@ -226,7 +226,7 @@ def line_graph(data, gaus, params, name, covariance):
     
     name = ((name.replace('$','')).replace(' ','')).replace("\\rightarrow","")
     
-    plt.savefig('Gaussian_'+str(name) + '.png', dpi=1000)
+    #plt.savefig('Gaussian_'+str(name) + '.png', dpi=1000)
     
     return
 
@@ -297,6 +297,21 @@ def no_nan(data):
         if not np.any(np.isnan(line[0])):
             temp.append(line)
     return np.vstack(temp)
+
+def chi_uncertainty(data, gaus):
+    
+    upper_uncert = (sum((data[:,1]-gaus)**2) / ((len(data)-1)*0.5) )**(0.5)
+    lower_uncert = (sum((data[:,1]-gaus)**2) / ((len(data)-1)*1.5))**(0.5)
+    mean_uncert = (lower_uncert + upper_uncert)/2
+    
+    lower_uncert = '{:.2f}'.format(lower_uncert)
+    upper_uncert = '{:.2f}'.format(upper_uncert)
+    mean_uncert = '{:.2f}'.format(mean_uncert)
+    
+    print('\nUncertainty = ' + str(lower_uncert) + ' - ' + str(upper_uncert))
+    print('Mean uncertainty = ' + str(mean_uncert) + ' K')
+    
+    return lower_uncert, upper_uncert, mean_uncert
 
 
 get_data()
