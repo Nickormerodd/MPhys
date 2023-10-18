@@ -20,7 +20,10 @@ It then prints a final velocity which is calculated from the mean of the
 velocities, with an uncertainty on the mean velocity equal to the 
 standard deviation of the calculated velocities.
 
-This saves the figure created, so # that off if dont want figure saved.
+A histogram of the velocities are then plotted on a graph, with a gaussian 
+plotted through them to show that the spread of the calculated velocities.
+
+This code saves the figures created, so # that off if dont want figure saved.
 """
 import numpy as np
 from astropy.io import fits
@@ -36,6 +39,7 @@ from scipy.optimize import curve_fit
 from matplotlib.ticker import FuncFormatter
 import uncertainties.unumpy as unp
 from uncertainties import ufloat
+from scipy.stats import norm
 
 def get_data():
 
@@ -273,7 +277,7 @@ def filter_data(data, val_1, val_2):
 def velocity_func(f_obs, name):
     
     f_rest = float(input('What is the rest frequency in GHz for '+str(name)+'\n'))
-    velocity = -c*(f_rest-f_obs)/f_rest
+    velocity = c*(f_rest-f_obs)/f_rest
     print('v_radial_'+ str(name) + ' = ' + str(velocity*10**(-3)) + ' km/s')
     
     return velocity
@@ -281,8 +285,9 @@ def velocity_func(f_obs, name):
 def final_velocity(data):
     print('\n')
     data = no_nan(data)
-    data[:,0] = data[:,0]*10**(-3)
     if len(data[:,0]) > 1:
+        data[:,0] = data[:,0]*10**(-3)    
+        velocity_graph(data[:,0])
         for line in data:
             print('velocity_'+str(((line[1]))) +' = ' + str(line[0]) + ' km/s')
             
@@ -313,5 +318,46 @@ def chi_uncertainty(data, gaus):
     
     return lower_uncert, upper_uncert, mean_uncert
 
+def velocity_graph(velocities):
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+
+    mu, std = np.mean(velocities), np.std(velocities)
+    n_bins = len(velocities)
+    bin_edges = [v for v in velocities] + [mu + std] 
+
+    bin_centers = []
+    hist_heights = []
+    for i in range(n_bins):
+        center = (bin_edges[i] + bin_edges[i + 1]) / 2
+        bin_centers.append(center)
+        gaussian_value = norm.pdf(center, mu, std)
+        hist_heights.append(gaussian_value)
+
+    ax.bar(bin_centers, hist_heights, width=(bin_edges[1] - bin_edges[0]), 
+           alpha=0.5, color='b', edgecolor='k')
+
+    x = np.linspace(mu - 3 * std, mu + 3 * std, 100)
+    ax.plot(x, norm.pdf(x, mu, std), 'r', linewidth=2)
+    ax.plot([],[],label='$Mean = {:.2f} km/s'.format(mu))
+    ax.plot([],[],label='$\sigma$ = {:.2f} km/s'.format(std))
+    
+    mu = '{:.2f}'.format(mu)
+    std = '{:.2f}'.format(std)
+    ax.annotate(r'$\bar{v}$ = ' + str(mu) + ' $\pm$ ' + str(std) + ' km/s',
+                xy=(0.5, 0.5), xytext=(0, -145), 
+                xycoords='axes fraction', textcoords='offset points', fontsize=11,
+                ha='center', va='top')
+    
+    ax.set_xticks([])
+    ax.set_xlabel('Velocities, kms$^{-1}$')
+    ax.set_ylabel('Density')
+    ax.set_title('Velocity Distribution')
+    ax.grid(True, linewidth = 0.5)
+    
+    ax.legend()
+    
+    return
 
 get_data()
