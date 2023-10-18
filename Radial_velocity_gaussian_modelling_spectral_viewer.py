@@ -352,7 +352,6 @@ def velocity_graph(velocities):
     
     ax.set_xticks([])
     ax.set_xlabel('Velocities, kms$^{-1}$')
-    ax.set_ylabel('Density')
     ax.set_title('Velocity Distribution')
     ax.grid(True, linewidth = 0.5)
     
