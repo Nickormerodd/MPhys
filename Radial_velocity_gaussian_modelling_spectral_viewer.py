@@ -340,8 +340,6 @@ def velocity_graph(velocities):
 
     x = np.linspace(mu - 3 * std, mu + 3 * std, 100)
     ax.plot(x, norm.pdf(x, mu, std), 'r', linewidth=2)
-    ax.plot([],[],label='$Mean = {:.2f} km/s'.format(mu))
-    ax.plot([],[],label='$\sigma$ = {:.2f} km/s'.format(std))
     
     mu = '{:.2f}'.format(mu)
     std = '{:.2f}'.format(std)
@@ -350,10 +348,10 @@ def velocity_graph(velocities):
                 xycoords='axes fraction', textcoords='offset points', fontsize=11,
                 ha='center', va='top')
     
-    ax.set_xticks([])
+    ax.set_yticks([])
     ax.set_xlabel('Velocities, kms$^{-1}$')
     ax.set_title('Velocity Distribution')
-    ax.grid(True, linewidth = 0.5)
+    ax.grid(True, linewidth = 0.5, alpha=0.5)
     
     ax.legend()
     
