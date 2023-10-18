@@ -344,7 +344,7 @@ def velocity_graph(velocities):
     mu = '{:.2f}'.format(mu)
     std = '{:.2f}'.format(std)
     ax.annotate(r'$\bar{v}$ = ' + str(mu) + ' $\pm$ ' + str(std) + ' km/s',
-                xy=(0.5, 0.5), xytext=(0, -145), 
+                xy=(0.5, 0.5), xytext=(0, -150), 
                 xycoords='axes fraction', textcoords='offset points', fontsize=11,
                 ha='center', va='top')
     
