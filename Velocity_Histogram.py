@@ -36,7 +36,7 @@ for velocity in velocities:
     data_points += list(np.linspace(velocity - range_width, velocity + range_width, num_points))
 
 # Create a histogram
-hist, bins, _ = plt.hist(data_points, bins=20, edgecolor='black', alpha=0.7)
+hist, bins, _ = plt.hist(data_points, bins=30, edgecolor='black', alpha=0.7, color = 'indigo')
 bin_centers = (bins[1:] + bins[:-1]) / 2
 
 # Define the Gaussian function
@@ -52,13 +52,13 @@ params, _ = curve_fit(gaussian, bin_centers, hist, p0=[max(hist), mean_estimate,
 fit_curve = gaussian(bin_centers, *params)
 
 # Plot the histogram and the fitted Gaussian curve
-plt.plot(bin_centers, fit_curve, 'r-', label='Gaussian Fit')
+plt.plot(bin_centers, fit_curve, 'y-',color = 'gold', label='Gaussian Fit')
 plt.plot([],[], label = 'v = {:.3f}'.format(params[1]), alpha = 0)
 plt.plot([],[], label = '$\sigma$ = {:.3f}'.format(params[2]), alpha = 0)
 plt.title('Velocity Distribution with Gaussian Fit')
 plt.xlabel('Velocity')
 plt.ylabel('Frequency')
-plt.grid(True, alpha = 0.5)
+plt.grid(True, alpha = 0.2)
 plt.legend()
 
 plt.savefig('Velocity_Histogram.png', dpi = 1000)
