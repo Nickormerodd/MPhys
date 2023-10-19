@@ -341,8 +341,8 @@ def velocity_graph(velocities):
     x = np.linspace(mu - 3 * std, mu + 3 * std, 100)
     ax.plot(x, norm.pdf(x, mu, std), 'r', linewidth=2)
     
-    mu = '{:.2f}'.format(mu)
-    std = '{:.2f}'.format(std)
+    mu = '{:.4f}'.format(mu)
+    std = '{:.3f}'.format(std)
     ax.annotate(r'$\bar{v}$ = ' + str(mu) + ' $\pm$ ' + str(std) + ' km/s',
                 xy=(0.5, 0.5), xytext=(0, -150), 
                 xycoords='axes fraction', textcoords='offset points', fontsize=11,
@@ -351,9 +351,9 @@ def velocity_graph(velocities):
     ax.set_yticks([])
     ax.set_xlabel('Velocities, kms$^{-1}$')
     ax.set_title('Velocity Distribution')
-    ax.grid(True, linewidth = 0.5, alpha=0.5)
+    ax.grid(True, linewidth = 0.5, alpha = 0.5)
     
-    ax.legend()
+    #plt.savefig('', dpi=10000)
     
     return
 
