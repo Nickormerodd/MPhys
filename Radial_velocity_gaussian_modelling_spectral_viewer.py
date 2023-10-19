@@ -230,7 +230,7 @@ def line_graph(data, gaus, params, name, covariance):
     
     name = ((name.replace('$','')).replace(' ','')).replace("\\rightarrow","")
     
-    #plt.savefig('Gaussian_'+str(name) + '.png', dpi=1000)
+    plt.savefig('Gaussian_CH3CN_'+str(name) + '.png', dpi=1000, bbox_inches='tight')
     
     return
 
@@ -287,12 +287,13 @@ def final_velocity(data):
     data = no_nan(data)
     if len(data[:,0]) > 1:
         data[:,0] = data[:,0]*10**(-3)    
-        velocity_graph(data[:,0])
+        
         for line in data:
             print('velocity_'+str(((line[1]))) +' = ' + str(line[0]) + ' km/s')
             
         mean_v = np.mean(data[:,0])
         std_dev_v = np.std(data[:,0])
+        velocity_graph(data[:,0], std_dev_v)
         print('\nMean_velocity = ' +  str(mean_v) + ' +/- ' + str(std_dev_v) + ' km/s')
     return
 
@@ -318,42 +319,58 @@ def chi_uncertainty(data, gaus):
     
     return lower_uncert, upper_uncert, mean_uncert
 
-def velocity_graph(velocities):
+def velocity_graph(velocities, std):
     
     fig = plt.figure()
     ax = fig.add_subplot(111)
-
-    mu, std = np.mean(velocities), np.std(velocities)
-    n_bins = len(velocities)
-    bin_edges = [v for v in velocities] + [mu + std] 
-
-    bin_centers = []
-    hist_heights = []
-    for i in range(n_bins):
-        center = (bin_edges[i] + bin_edges[i + 1]) / 2
-        bin_centers.append(center)
-        gaussian_value = norm.pdf(center, mu, std)
-        hist_heights.append(gaussian_value)
-
-    ax.bar(bin_centers, hist_heights, width=(bin_edges[1] - bin_edges[0]), 
-           alpha=0.5, color='b', edgecolor='k')
-
-    x = np.linspace(mu - 3 * std, mu + 3 * std, 100)
-    ax.plot(x, norm.pdf(x, mu, std), 'r', linewidth=2)
     
-    mu = '{:.4f}'.format(mu)
-    std = '{:.3f}'.format(std)
-    ax.annotate(r'$\bar{v}$ = ' + str(mu) + ' $\pm$ ' + str(std) + ' km/s',
-                xy=(0.5, 0.5), xytext=(0, -150), 
-                xycoords='axes fraction', textcoords='offset points', fontsize=11,
-                ha='center', va='top')
+    range_width = std
     
-    ax.set_yticks([])
-    ax.set_xlabel('Velocities, kms$^{-1}$')
-    ax.set_title('Velocity Distribution')
-    ax.grid(True, linewidth = 0.5, alpha = 0.5)
+    # Initialize an empty list to store data points
+    data_points = []
     
-    #plt.savefig('', dpi=10000)
+    # Generate 100 data points for each velocity
+    num_points = 100
+    for velocity in velocities:
+        data_points += list(np.linspace(velocity - range_width, velocity + range_width, num_points))
+    
+    # Create a histogram
+    hist, bins, _ = plt.hist(data_points, bins=30, edgecolor='black', alpha=0.7,
+                             color='indigo')
+    bin_centers = (bins[1:] + bins[:-1]) / 2
+    
+    # Perform the curve fit with better initial guesses
+    mean_estimate = np.mean(data_points)
+    stddev_estimate = np.std(data_points)
+    params, _ = curve_fit(gaussian, bin_centers, hist, p0=[max(hist), mean_estimate, stddev_estimate])
+    
+    # Create the fitted Gaussian curve
+    fit_curve = gaussian(bin_centers, *params)
+    
+    # Plot the histogram and the fitted Gaussian curve
+    ax.plot(bin_centers, fit_curve, label='Gaussian Fit', color ='gold')
+    ax.plot([],[],label="v = {:.3f} km/s".format(params[1]), alpha =0)
+    ax.plot([],[],label="$\sigma$ = {:.3f} km/s".format(params[2]), alpha=0)
+    ax.set_title('Weighted Velocity Distribution')
+    ax.set_xlabel('Velocity')
+    ax.set_ylabel('Frequency')
+    ax.grid(True, alpha=0.2)
+    ax.legend()
+    ax.annotate(r'Mean = ' + str('{:.3f}'.format(np.mean(velocities))) + ' $\pm$ ' + str('{:.3f}'.format(std)) + ' km/s',
+            xy=(0.5, 0.5), xytext=(0, -145), 
+            xycoords='axes fraction', textcoords='offset points', fontsize=11,
+            ha='center', va='top')
+    ax.annotate(r'Weighted mean = ' + str('{:.3f}'.format(params[1])) + ' $\pm$ ' + str('{:.3f}'.format(params[2])) + ' km/s',
+            xy=(0.5, 0.5), xytext=(0, -160), 
+            xycoords='axes fraction', textcoords='offset points', fontsize=11,
+            ha='center', va='top')
+    
+    # Display the Gaussian parameters (Amplitude, Mean, and Standard Deviation)
+
+    print("\nWeighted final velocity = ",
+          "{} +/- {} km/s".format(params[1], params[2]))
+        
+    plt.savefig('Weighted_velocity_distribution.png', dpi=1000, bbox_inches='tight')
     
     return
 
