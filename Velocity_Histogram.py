@@ -53,14 +53,15 @@ fit_curve = gaussian(bin_centers, *params)
 
 # Plot the histogram and the fitted Gaussian curve
 plt.plot(bin_centers, fit_curve, 'r-', label='Gaussian Fit')
+plt.plot([],[], label = 'v = {:.3f}'.format(params[1]), alpha = 0)
+plt.plot([],[], label = '$\sigma$ = {:.3f}'.format(params[2]), alpha = 0)
 plt.title('Velocity Distribution with Gaussian Fit')
 plt.xlabel('Velocity')
 plt.ylabel('Frequency')
-plt.grid(True)
+plt.grid(True, alpha = 0.5)
 plt.legend()
 
-# Show the plot
-plt.show()
+plt.savefig('Velocity_Histogram.png', dpi = 1000)
 
 # Display the Gaussian parameters (Amplitude, Mean, and Standard Deviation)
 print("Amplitude (A):", params[0])
@@ -68,3 +69,6 @@ print("Mean (mu):", params[1])
 print("Standard Deviation (sigma):", params[2])
 print("\nThe final velocity (with a weighted mean) is",
       " {:.3f} +/- {:.3f} km/s".format(params[1], params[2]))
+
+# Show the plot
+plt.show()
