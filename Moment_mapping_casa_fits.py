@@ -6,7 +6,7 @@ Created on Tue Oct 10 15:57:51 2023
 
 import numpy as np
 from astropy.io import fits
-#from spectral_cube import SpectralCube as sc
+from spectral_cube import SpectralCube as sc
 from tkinter import Tk
 from tkinter import filedialog
 import matplotlib.pyplot as plt
@@ -15,15 +15,18 @@ import os
 
 def get_data():
 
-    Tk().withdraw()
+    Tk().withdraw()  
     file_paths = filedialog.askopenfilenames()
     for file_path in file_paths:
         data = fits.open(file_path)
         filename = (os.path.basename(file_path).replace(".fits", ""))#.replace("_"," ").replace("."," ")
         main(data, filename, file_path)
-        data.close()
+        data.close()   
+    
+    #four_plot(file_paths)
+    
     return
-
+                                     
 
 def main(data, name, path):
 
@@ -34,10 +37,22 @@ def main(data, name, path):
     p = data[0].shape[2]
 
     print(data[0].shape)
-
-    x = np.linspace(0, p - 1, p)
-    y = np.linspace(0, m - 1, m)
-    X, Y = np.meshgrid(x, y)
+    header = data[0].header
+    print(header)
+    #    Extract relevant header values
+    ctype1 = header['CTYPE1']
+    crval1 = header['CRVAL1']
+    cdelt1 = header['CDELT1']
+    crpix1 = header['CRPIX1']
+    
+    ctype2 = header['CTYPE2']
+    crval2 = header['CRVAL2']
+    cdelt2 = header['CDELT2']
+    crpix2 = header['CRPIX2']
+    
+    # Create the coordinate arrays
+    x = (crval1 + (np.arange(data[0].shape[2]) - crpix1) * cdelt1)
+    y = (crval2 + (np.arange(data[0].shape[1]) - crpix2) * cdelt2)
 
     median = np.nanmedian(data[0].data[0])
     print(median)
@@ -84,20 +99,25 @@ def main(data, name, path):
     else:
         title = 'unknown'
 
-    contourf = ax.contourf(X, Y, data[0].data[0] , cmap='bwr',
+    contourf = ax.contourf(x, y, data[0].data[0] , cmap='bwr',
                            levels = 50) # 'viridis')
     plt.colorbar(contourf, label='km/s')
     ax.set_title(title)
 
-    ax.set_xticks([])
-    ax.set_yticks([])
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['bottom'].set_visible(False)
-    ax.spines['left'].set_visible(False)
-
-    plt.savefig(name, dpi=1000)
+    #ax.set_xticks([])
+    #ax.set_yticks([])
+    #ax.spines['top'].set_visible(False)
+    #ax.spines['right'].set_visible(False)
+    #ax.spines['bottom'].set_visible(False)
+    #ax.spines['left'].set_visible(False)
+    
+    ax.set_xlabel(ctype1)
+    ax.set_ylabel(ctype2)
+    #plt.title('Contour Plot')
+    ax.invert_xaxis()  # Invert the x-axis to match the standard Galactic coordinate system
+    #ax.invert_yaxis()  # Invert the y-axis
+    ax.grid(alpha=0.2)
+    
+    #plt.savefig(name, dpi=1000)
 
     return
-
-get_data()
