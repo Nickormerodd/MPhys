@@ -36,9 +36,9 @@ def main(data, name, path):
     m = data[0].shape[1]
     p = data[0].shape[2]
 
-    print(data[0].shape)
+    #print(data[0].shape)
     header = data[0].header
-    print(header)
+    #print(header)
     #    Extract relevant header values
     ctype1 = header['CTYPE1']
     crval1 = header['CRVAL1']
@@ -57,7 +57,7 @@ def main(data, name, path):
     median = np.nanmedian(data[0].data[0])
     print(median)
 
-    name = name.replace("_image","") + ".png"
+    name = name.replace("_image","") + "_gal" +".png"
     print(name)
 
     calibration_freq = 220.70908 #GHz
@@ -118,6 +118,6 @@ def main(data, name, path):
     #ax.invert_yaxis()  # Invert the y-axis
     ax.grid(alpha=0.2)
     
-    #plt.savefig(name, dpi=1000)
+    plt.savefig(name, dpi=1000, bbox_inches = 'tight')
 
     return
