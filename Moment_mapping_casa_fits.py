@@ -12,21 +12,22 @@ from tkinter import filedialog
 import matplotlib.pyplot as plt
 from scipy.constants import c
 import os
+#from matplotlib.patches import FancyArrrowPatch as fap
 
 def get_data():
 
-    Tk().withdraw()
+    Tk().withdraw()  
     file_paths = filedialog.askopenfilenames()
     for file_path in file_paths:
         data = fits.open(file_path)
         filename = (os.path.basename(file_path).replace(".fits", ""))#.replace("_"," ").replace("."," ")
         main(data, filename, file_path)
-        data.close()
-
+        data.close()   
+    
     #four_plot(file_paths)
-
+    
     return
-
+                                     
 
 def main(data, name, path):
 
@@ -44,12 +45,12 @@ def main(data, name, path):
     crval1 = header['CRVAL1']
     cdelt1 = header['CDELT1']
     crpix1 = header['CRPIX1']
-
+    
     ctype2 = header['CTYPE2']
     crval2 = header['CRVAL2']
     cdelt2 = header['CDELT2']
     crpix2 = header['CRPIX2']
-
+    
     # Create the coordinate arrays
     x = (crval1 + (np.arange(data[0].shape[2]) - crpix1) * cdelt1)
     y = (crval2 + (np.arange(data[0].shape[1]) - crpix2) * cdelt2)
@@ -116,28 +117,38 @@ def main(data, name, path):
 
     name = "CH3CN_k=" + str(k_number) + "_gal" +".png"
     print(name)
-
+        
+    x_au = x * 8.1 * 10**3 * 206264.81 * np.pi/180
+    y_au = y * 8.1 * 10**3 * 206264.81 * np.pi/180
+    
+    x_norm = np.abs(1000 / (8.1 * 10**3 * 206264.81 * np.pi/180))
+    y_norm = np.abs(1000 / (8.1 * 10**3 * 206264.81 * np.pi/180))
+    
+    print(len(y))
+    print(np.mean(y))
+    
+    x_point = np.min(x) + +(np.mean(x)/(len(x)*160))
+    y_point = np.min(y)+(np.mean(y)/(len(y)*150))
+    x_values = np.linspace(x_point, x_point+x_norm,2)
+    y_values = np.linspace(y_point,y_point,2)
+    ax.plot(x_values,y_values,color='black')#, label='1000 AU')
+    ax.plot([],[],label='1000 AU', color='black', alpha=0)
+    arrow_props = dict(arrowstyle='->', linewidth=1, color='black')
     contourf = ax.contourf(x, y, data[0].data[0] , cmap='bwr',
                            levels = 50) # 'viridis')
     plt.colorbar(contourf, label='km/s')
     ax.set_title(title)
-
-    #ax.set_xticks([])
-    #ax.set_yticks([])
-    #ax.spines['top'].set_visible(False)
-    #ax.spines['right'].set_visible(False)
-    #ax.spines['bottom'].set_visible(False)
-    #ax.spines['left'].set_visible(False)
-
+    
     ax.set_xlabel(ctype1)
     ax.set_ylabel(ctype2)
-    #plt.title('Contour Plot')
     ax.invert_xaxis()  # Invert the x-axis to match the standard Galactic coordinate system
     #ax.invert_yaxis()  # Invert the y-axis
     ax.grid(alpha=0.2)
-
-    plt.savefig(name, dpi=1000, bbox_inches = 'tight')
+    ax.legend(loc='lower right', fontsize=7.5, borderaxespad=0.5, frameon=False, edgecolor='black')
+    
+    #plt.savefig(name, dpi=1000, bbox_inches='tight')
 
     return
+
 
 get_data()
