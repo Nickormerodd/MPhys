@@ -121,3 +121,5 @@ def main(data, name, path):
     plt.savefig(name, dpi=1000, bbox_inches = 'tight')
 
     return
+
+get_data()
