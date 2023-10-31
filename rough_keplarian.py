@@ -16,70 +16,72 @@ from scipy.constants import c
 from astropy import units as u
 from scipy.optimize import curve_fit
 from matplotlib.ticker import FuncFormatter
-import uncertainties.unumpy as unp
-from uncertainties import ufloat
+#import uncertainties.unumpy as unp
+#from uncertainties import ufloat
 from scipy.stats import norm
 
 G = 6.67430**(-11)
 AU = 1.496*10**11
+distance = 1500 #Distance of keplarian linear extent in AU
 
 def get_data():
 
-    Tk().withdraw()  
+    Tk().withdraw()
     file_paths = filedialog.askopenfilenames()
     for file_path in file_paths:
         data = fits.open(file_path)
         filename = (os.path.basename(file_path).replace(".fits", ""))#.replace("_"," ").replace("."," ")
         main(data, filename, file_path)
-        data.close()   
-    
+        data.close()
+
     return
 
 
 def main(data, filename, path):
-    
+
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    
+
     header = data[0].header
-    
+
     ctype1 = header['CTYPE1']
     crval1 = header['CRVAL1']
     cdelt1 = header['CDELT1']
     crpix1 = header['CRPIX1']
-    
+
     ctype2 = header['CTYPE2']
     crval2 = header['CRVAL2']
     cdelt2 = header['CDELT2']
     crpix2 = header['CRPIX2']
     calibration_freq = 220.70908 #GHz
-    
+
     k_number = 7
     conversion = (c/1000) * (220.538635 - calibration_freq)/calibration_freq
     data[0].data[0] = data[0].data[0] + conversion
-    
+
     # Create the coordinate arrays
     x = (crval1 + (np.arange(data[0].shape[2]) - crpix1) * cdelt1)
     y = (crval2 + (np.arange(data[0].shape[1]) - crpix2) * cdelt2)
-    
+
     x_au = x * 8.1 * 10**3 * 206264.81 * np.pi/180
     y_au = y * 8.1 * 10**3 * 206264.81 * np.pi/180
-    
+
     y_o = np.mean(y_au)
     x_o = np.mean(x_au)
 
     mom = data[0].data[0]
     v_0 = np.nanmean(mom)
-    print(v_0)
+    print('Average velocity = {:.3f}, has been subtracted from each value'.format(v_0),
+          'and absolute relative velocities are plotted')
     temp = []  # Create an empty list to store the values
     for i in range(mom.shape[0]):  # Loop through rows
         for j in range(mom.shape[1]):  # Loop through columns
             value = mom[i, j]  # Get the value at the current position
             if not (np.isnan(value).any() or value == 0):
                 # Calculate distance using x_au and y_au arrays
-                dist = np.sqrt((y_au[i] - y_o)**2 + (x_au[j] - x_o)**2) 
+                dist = np.sqrt((y_au[i] - y_o)**2 + (x_au[j] - x_o)**2)
                 temp.append((np.abs(dist), (value-v_0)))  # Store the distance and value
-                
+
                 # Sort the list based on distances
     temp.sort(key=lambda x: x[0])
 
@@ -89,9 +91,9 @@ def main(data, filename, path):
 
     # Convert distances to AU if needed
     # For example, if your distances are in parsecs, you can convert to AU using: distances = np.array(distances) * 206264.81 * 8.1 * 10**3
-    
+
     combined = np.hstack((np.vstack((distances)), np.vstack(velocity)))
-    
+
     pos = []
     neg = []
     for line in combined:
@@ -101,8 +103,8 @@ def main(data, filename, path):
         if line[1] >= 0:
             line[1] = np.abs(line[1])
             pos.append(line)
-    pos = np.vstack((pos))
-    neg = np.vstack((neg))
+    pos,neg = np.vstack((pos)), np.vstack((neg))
+
     # Create a scatter plot
     #ax.scatter(distances, velocity)
     ax.scatter(pos[:,0],pos[:,1], label = '+ve', alpha=0.7, s=15)
@@ -110,10 +112,9 @@ def main(data, filename, path):
     ax.set_xlabel('Distance AU')
     ax.set_ylabel('Velocity, km/s')
     ax.set_title('Velocity-Distance for k=7')
-    
-    #combined[:,1] = np.abs(combined[:,1])
+
     combined = np.vstack((pos,neg))
-    
+
     new_pos = filtered(pos)
     new_neg = filtered(neg)
     new_comb = filtered(combined)
@@ -124,7 +125,7 @@ def main(data, filename, path):
     M_neg = solar_mass(a_neg)
     M_comb = solar_mass(a_comb)
 
-    
+
     ax.plot(new_pos[:,0], keplarian(new_pos[:,0],a_pos),
             label = r'+ve: $M_{\odot}$= ' + str('{:.3f}'.format(M_pos)),
             color = 'green', alpha=0.5)
@@ -134,30 +135,33 @@ def main(data, filename, path):
     ax.plot(new_comb[:,0], keplarian(new_comb[:,0],a_comb),
             label = r'Both: $M_{\odot}$= ' + str('{:.3f}'.format(M_comb)),
             color = 'purple', alpha=0.5)
-    
+
     ax.legend(fontsize=8, borderaxespad=0.5, frameon=False, edgecolor='black')
-    
+
+    print('\nThe Mass of the envelope up to a distance of {:.0f}'.format(distance),
+          'should be between {:.3f} and {:.3f} Solar Masses'.format(M_pos, M_neg))
+
     return
 
 def keplarian(distances, a):
-    
-    v = a * distances#**(1/2)
-    
+
+    v = a * distances
+
     return v
 
 def filtered(data):
-    
+
     piglords = []
     for line in data:
-        if not line[0] > 1500:
+        if not line[0] > distance:
             piglords.append(line)
-    
+
     new_data = np.vstack((piglords))
-    
+
     return new_data
 
 def curve(data):
-    
+
     GUESS = None
     n=0
     while n < 5:
@@ -169,22 +173,14 @@ def curve(data):
             break
         GUESS = params
         n+=1
-        
+
     a = (params[0])
-    
+
     return a
-"""
-def solar_mass(a):
-    
-    slug = a*10**3 / ((1.496*10**11)**0.5)
-    M_sol = slug**2 / (G * 1.988*10**30)
-    
-    return M_sol
-"""
 
 def solar_mass(a):
 
-    Nistance_AU = 1500 * AU
+    Nistance_AU = distance * AU
     M_sol = a**2 * Nistance_AU**2/ (G * 1.988*10**30)
 
     return M_sol
