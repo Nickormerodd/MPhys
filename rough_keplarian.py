@@ -22,7 +22,7 @@ from scipy.stats import norm
 
 G = 6.67430**(-11)
 AU = 1.496*10**11
-distance = 1500 #Distance of keplarian linear extent in AU
+distance =1500 #Distance of keplarian linear extent in AU
 
 def get_data():
 
@@ -107,8 +107,8 @@ def main(data, filename, path):
 
     # Create a scatter plot
     #ax.scatter(distances, velocity)
-    ax.scatter(pos[:,0],pos[:,1], label = '+ve', alpha=0.7, s=15)
-    ax.scatter(neg[:,0],neg[:,1], label = '-ve', alpha=0.7, s=15)
+    ax.scatter(pos[:,0],pos[:,1], label = '+ve', alpha=0.7, s=10)
+    ax.scatter(neg[:,0],neg[:,1], label = '-ve', alpha=0.7, s=10)
     ax.set_xlabel('Distance AU')
     ax.set_ylabel('Velocity, km/s')
     ax.set_title('Velocity-Distance for k=7')
@@ -138,8 +138,10 @@ def main(data, filename, path):
 
     ax.legend(fontsize=8, borderaxespad=0.5, frameon=False, edgecolor='black')
 
-    print('\nThe Mass of the envelope up to a distance of {:.0f}'.format(distance),
+    print('\nThe Mass of the envelope up to a distance of {:.0f} AU'.format(distance),
           'should be between {:.3f} and {:.3f} Solar Masses'.format(M_pos, M_neg))
+
+    plt.savefig(bbox_inches = 'tight', fname = 'Initial_Velocity_Curve.png', dpi = 700)
 
     return
 
