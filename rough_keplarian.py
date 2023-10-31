@@ -20,7 +20,7 @@ import uncertainties.unumpy as unp
 from uncertainties import ufloat
 from scipy.stats import norm
 
-G = 6.67430e-11
+G = 6.67430**(-11)
 
 def get_data():
 
@@ -31,8 +31,6 @@ def get_data():
         filename = (os.path.basename(file_path).replace(".fits", ""))#.replace("_"," ").replace("."," ")
         main(data, filename, file_path)
         data.close()   
-    
-    #four_plot(file_paths)
     
     return
 
@@ -68,20 +66,8 @@ def main(data, filename, path):
     
     y_o = np.mean(y_au)
     x_o = np.mean(x_au)
-    """
-    temp = []
-    for line in data[0].data:
-        for i in line:
-            if i == np.nan or i == 0:
-                pass
-            else:
-                dist = ((y_au[line] - y_o)**2 + (x_au[i] - x_o)**2)**(1/2)
-                temp = temp.append(i)
-            
-    """
+
     mom = data[0].data[0]
-    #print(mom)
-    
     v_0 = np.nanmean(mom)
     print(v_0)
     temp = []  # Create an empty list to store the values
@@ -91,7 +77,7 @@ def main(data, filename, path):
             if not (np.isnan(value).any() or value == 0):
                 # Calculate distance using x_au and y_au arrays
                 dist = np.sqrt((y_au[i] - y_o)**2 + (x_au[j] - x_o)**2) 
-                temp.append((np.abs(dist), np.abs(value-v_0)))  # Store the distance and value
+                temp.append((np.abs(dist), (value-v_0)))  # Store the distance and value
                 
                 # Sort the list based on distances
     temp.sort(key=lambda x: x[0])
@@ -103,19 +89,78 @@ def main(data, filename, path):
     # Convert distances to AU if needed
     # For example, if your distances are in parsecs, you can convert to AU using: distances = np.array(distances) * 206264.81 * 8.1 * 10**3
     
+    combined = np.hstack((np.vstack((distances)), np.vstack(velocity)))
+    
+    pos = []
+    neg = []
+    for line in combined:
+        if line[1] < 0:
+            line[1] = np.abs(line[1])
+            neg.append(line)
+        if line[1] >= 0:
+            line[1] = np.abs(line[1])
+            pos.append(line)
+    pos,neg = np.vstack((pos)), np.vstack((neg))
+    
     # Create a scatter plot
-    ax.scatter(distances, velocity)
+    #ax.scatter(distances, velocity)
+    ax.scatter(pos[:,0],pos[:,1], label = '+ve', alpha=0.7, s=15)
+    ax.scatter(neg[:,0],neg[:,1], label = '-ve', alpha=0.7, s=15)
     ax.set_xlabel('Distance AU')
     ax.set_ylabel('Velocity, km/s')
-    ax.set_title('Velocity-Distance')
-    #ax.grid(True)
-    #plt.show()
+    ax.set_title('Velocity-Distance for k=7')
+    
+    combined[:,1] = np.abs(combined[:,1])
+    
+    new_pos = filtered(pos)
+    new_neg = filtered(neg)
+    new_comb = filtered(combined)
+    a_pos = curve(new_pos)
+    a_neg = curve(new_neg)
+    a_comb = curve(new_comb)
+    M_pos = solar_mass(a_pos)
+    M_neg = solar_mass(a_neg)
+    M_comb = solar_mass(a_comb)
+
+    
+    ax.plot(new_pos[:,0], keplarian(new_pos[:,0],a_pos),
+            label = r'+ve: $M_{\odot}$= ' + str('{:.3f}'.format(M_pos)),
+            color = 'green', alpha=0.5)
+    ax.plot(new_neg[:,0], keplarian(new_neg[:,0],a_neg),
+            label = r'-ve: $M_{\odot}$= ' + str('{:.3f}'.format(M_neg)),
+            color = 'red', alpha=0.5)
+    ax.plot(new_comb[:,0], keplarian(new_comb[:,0],a_comb),
+            label = r'Both: $M_{\odot}$= ' + str('{:.3f}'.format(M_comb)),
+            color = 'purple', alpha=0.5)
+    
+    ax.legend(fontsize=8, borderaxespad=0.5, frameon=False, edgecolor='black')
+    
+    return
+
+def keplarian(distances, a):
+    
+    v = a * distances**(1/2)
+    
+    return v
+
+def filtered(data):
+    
+    piglords = []
+    for line in data:
+        if not line[0] > 1500:
+            piglords.append(line)
+    
+    new_data = np.vstack((piglords))
+    
+    return new_data
+
+def curve(data):
     
     GUESS = None
     n=0
     while n < 5:
         try:
-            params, covariance = curve_fit(keplarian, distances, velocity,
+            params, covariance = curve_fit(keplarian, data[:,0], data[:,1],
                                            p0=GUESS, absolute_sigma=True,
                                            maxfev=2000)
         except ValueError or RuntimeWarning:
@@ -123,24 +168,15 @@ def main(data, filename, path):
         GUESS = params
         n+=1
         
-    a = params[0]
-    print(a)
-    M_sol = a**2 / (G * 1.988*10**30)
-    #M_sol_pig = '{:.3f}'.format(M_sol)
+    a = (params[0])
     
-    
-    #print(vel)
-    
-    ax.plot(dist, keplarian(distances,a), label = r'$M_{odot}$= ' + str('{:.3f}'.format(M_sol)))
-    
-    ax.legend()
-    
-    return
+    return a
 
-def keplarian(dist, a):
+def solar_mass(a):
     
-    v = a * dist**(-0.5)
+    slug = a*10**3 / ((1.496*10**11)**0.5)
+    M_sol = slug**2 / (G * 1.988*10**30)
     
-    return v
+    return M_sol
 
 get_data()
