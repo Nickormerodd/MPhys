@@ -71,7 +71,7 @@ def main(data, filename, path):
 
     mom = data[0].data[0]
     v_0 = np.nanmean(mom)
-    print('\nAverage velocity = {:.3f}, has been subtracted from each value'.format(v_0),
+    print('\nAverage velocity = {:.3f} km/s, has been subtracted from each value'.format(v_0),
           'and absolute relative velocities are plotted')
     temp = []  # Create an empty list to store the values
     for i in range(mom.shape[0]):  # Loop through rows
