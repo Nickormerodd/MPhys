@@ -1,8 +1,9 @@
 """
-Created on Fri Nov  3 14:40:36 2023
+Created on Sat Nov  4 22:37:22 2023
 
 @author: Christopher
 """
+
 
 import numpy as np
 from astropy.io import fits
@@ -10,6 +11,7 @@ from tkinter import Tk
 from tkinter import filedialog
 import os
 import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
 
 
 def get_data():
@@ -25,39 +27,56 @@ def get_data():
         
     return
 
-
 def main(data, filename, path):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    
+
     num_channels = data[0].shape[0]
     shape = (data[0].shape[1], data[0].shape[2])
     temp = np.zeros(shape)
-    
+
     for i in range(num_channels):
         temp = temp + data[0].data[i]
-    
-    temp = temp / num_channels
-    max_x,max_y = find_max_value_coordinates(temp)
-    print('epic')
-    print('centre (x,y) = ' +str(max_x) + ',' + str(max_y) + ' pixels')
-    
-    m, p = temp.shape  
-    X, Y = np.meshgrid(range(p), range(m))
 
-    surf = ax.plot_surface(X, Y, temp, cmap='magma', linewidth=0, antialiased=False)
+    # Clean the data by replacing NaNs with zeros
+    temp = temp/num_channels
+    temp[np.isnan(temp)] = 0
+
+    m, p = temp.shape
+    X, Y = np.meshgrid(range(p), range(m))
+    xdata = np.column_stack((X.ravel(), Y.ravel()))
+
+    def func(xdata, A, mean_x, mean_y, sigma):
+        x, y = xdata[:, 0], xdata[:, 1]
+        return A * np.exp(-((x - mean_x) ** 2 + (y - mean_y) ** 2) / (2 * sigma ** 2))
+
+    # Initial guess for the parameters
+    initial_guess = (temp.max(), np.argmax(temp) % temp.shape[1], np.argmax(temp) // temp.shape[1], 1.0)
+
+    popt, _ = curve_fit(func, xdata, temp.ravel(), p0=initial_guess)
+
+    # Extract the (x, y) coordinates of the Gaussian fit's maximum
+    new_max_x, new_max_y = int(popt[1]), int(popt[2])
+
+    max_x,max_y = find_max_value_coordinates(temp)
+
+    print('Position of maximum value (x, y) = ' + str(max_x) + ', ' + str(max_y) + ' pixels')
+    print('Position of maximum value from Gaussian fit (x, y) = ' + str(new_max_x) + ', ' + str(new_max_y) + ' pixels')
+
+    # Generate the fitted surface using the parameters obtained
+    fitted_surface = func(xdata, *popt).reshape(m, p)
+
+    surf = ax.plot_surface(X, Y, fitted_surface, cmap='viridis', linewidth=0, antialiased=False)
 
     # Customize the plot (labels, title, etc.) as needed
-    #ax.set_xlabel('X')
-    
-    #ax.set_ylabel('Y')
-    #ax.set_zlabel('Z')
-    ax.set_title('Location of Protostar')
-    
+    ax.set_title('Location of Protostar - Gaussian Fit')
+
     # Add a colorbar
-    fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5, label='K')
-    
-    return 
+    #fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5, label='K')
+
+    plt.show()
+
+
 
 
 def find_max_value_coordinates(arr):
@@ -80,5 +99,9 @@ def main_2(data):
     print('epic')
     print(max_x,max_y)
     return
+
+def gaussian(x, A, mean, sigma):
+    return A * np.exp(-(x - mean)**2 / (2 * sigma**2))
+
 
 get_data()
