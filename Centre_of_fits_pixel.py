@@ -59,17 +59,17 @@ def main(data, filename, path):
     new_max_x, new_max_y = int(popt[1]), int(popt[2])
 
     max_x,max_y = find_max_value_coordinates(temp)
-
+    print('\nfile = '+ filename)
     print('Position of maximum value (x, y) = ' + str(max_x) + ', ' + str(max_y) + ' pixels')
     print('Position of maximum value from Gaussian fit (x, y) = ' + str(new_max_x) + ', ' + str(new_max_y) + ' pixels')
-
+    
     # Generate the fitted surface using the parameters obtained
     fitted_surface = func(xdata, *popt).reshape(m, p)
 
     surf = ax.plot_surface(X, Y, fitted_surface, cmap='viridis', linewidth=0, antialiased=False)
 
     # Customize the plot (labels, title, etc.) as needed
-    ax.set_title('Location of Protostar - Gaussian Fit')
+    ax.set_title('Location of Protostar - Gaussian Fit' + filename, size = 8)
 
     # Add a colorbar
     #fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5, label='K')
