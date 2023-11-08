@@ -23,6 +23,7 @@ def get_data():
         filename = (os.path.basename(file_path).replace(".fits", ""))#.replace("_"," ").replace("."," ")
         main(data, filename, file_path)
         data.close()   
+        print(file_path)
     
     #four_plot(file_paths)
     
@@ -114,6 +115,7 @@ def main(data, name, path):
 
     else:
         title = 'unknown'
+        k_number = 'unknown'
 
     name = "CH3CN_k=" + str(k_number) + "_gal" +".png"
     print(name)
@@ -124,8 +126,8 @@ def main(data, name, path):
     x_norm = np.abs(1000 / (8.1 * 10**3 * 206264.81 * np.pi/180))
     y_norm = np.abs(1000 / (8.1 * 10**3 * 206264.81 * np.pi/180))
     
-    print(len(y))
-    print(np.mean(y))
+    #print(len(y))
+    #print(np.mean(y))
     
     x_point = np.min(x) + +(np.mean(x)/(len(x)*160))
     y_point = np.min(y)+(np.mean(y)/(len(y)*150))
@@ -133,20 +135,34 @@ def main(data, name, path):
     y_values = np.linspace(y_point,y_point,2)
     ax.plot(x_values,y_values,color='black')#, label='1000 AU')
     ax.plot([],[],label='1000 AU', color='black', alpha=0)
+    
+    #y_au = 1000
+    y_norm = 1000 / (8.1 * 10**3 * 206264.81 * np.pi/180)
+    x_center = x_point + x_norm / 2  # Center of the x-direction line
+    y_point = np.min(y) - y_norm / 2  # Center of the y-direction line
+    x_values_y = np.linspace(x_center, x_center, 2)
+    y_values_y = np.linspace(y_point, y_point + y_norm, 2)
+    ax.plot(x_values_y, y_values_y, color='black')
+    
     arrow_props = dict(arrowstyle='->', linewidth=1, color='black')
     contourf = ax.contourf(x, y, data[0].data[0] , cmap='bwr',
                            levels = 50) # 'viridis')
     plt.colorbar(contourf, label='km/s')
     ax.set_title(title)
+    #centre = 48,46
+    print(data[0].shape)
+    #ax.scatter(x[48],y[46],label='centre')
     
-    ax.set_xlabel(ctype1)
-    ax.set_ylabel(ctype2)
+    
+    ax.set_xlabel("GLON deg")
+    ax.set_ylabel("GLAT deg")
+
     ax.invert_xaxis()  # Invert the x-axis to match the standard Galactic coordinate system
     #ax.invert_yaxis()  # Invert the y-axis
     ax.grid(alpha=0.2)
     ax.legend(loc='lower right', fontsize=7.5, borderaxespad=0.5, frameon=False, edgecolor='black')
     
-    #plt.savefig(name, dpi=1000, bbox_inches='tight')
+    plt.savefig(name, dpi=1000, bbox_inches='tight')
 
     return
 
