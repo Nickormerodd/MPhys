@@ -2,19 +2,6 @@
 Created on Wed Nov  8 12:59:29 2023
 
 @author: Christopher
-
-This code reads in a csv file which you have to specify below.
-This csv file has the following:
-1st column - file path to input file
-2nd column - file path to region file
-3rd coumn - channel range (format n-m)
-4th column - moments (in format 0,1,2,...,n)
-
-The first row isnt being read, so start from
-2nd row onwards.
-
-For any rows which you want the code to ignore,
-put a # infront of the file path in column 1.
 """
 
 import csv
@@ -80,6 +67,7 @@ def process_csv(csv_file):
             
             stats = cube.statistics()
             rms = stats['rms'].value
+            rms = float(rms)
             filename = os.path.splitext(os.path.basename(file_path))[0]
             name = filename.replace(".image.pbcor_line.galactic", "").replace("kelvin", "")
             
