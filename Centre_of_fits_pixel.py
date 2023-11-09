@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Created on Sat Nov  4 22:37:22 2023
 
@@ -27,7 +28,7 @@ def get_data():
         main(data, filename, file_path)
         main_2(data, filename, file_path)
         data.close()
-        
+
     return
 
 def main(data, filename, path):
@@ -66,26 +67,28 @@ def main(data, filename, path):
     print('\nfile = '+ filename)
     print('Position of maximum value (x, y) = ' + str(max_x) + ', ' + str(max_y) + ' pixels')
     print('Position of maximum value from Gaussian fit (x, y) = ' + str(new_max_x) + ', ' + str(new_max_y) + ' pixels')
-    
+
     # Generate the fitted surface using the parameters obtained
     fitted_surface = func(xdata, *popt).reshape(m, p)
 
-    surf = ax.plot_surface(X, Y, fitted_surface, cmap='viridis', 
+    surf = ax.plot_surface(X, Y, fitted_surface, cmap='viridis',
                            linewidth=0, antialiased=False)
     surf_2 = ax.plot_surface(X, Y, temp, cmap='magma',
                              linewidth=0, antialiased=False)
-    
+
     # Customize the plot (labels, title, etc.) as needed
     ax.set_title('Location of Protostar - Gaussian Fit ' + filename, size = 8)
 
     # Add a colorbar
     fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5, label='gaus')
     fig.colorbar(surf_2, ax=ax, shrink=0.5, aspect=5, label='data')
-    
+
+    plt.savefig(fname = 'Protostar_Centre_3D.png', bbox_inches = 'tight', dpi =600)
+
     plt.show()
 
 def main_2(data, filename, path):
-    
+
     fig = plt.figure()
     ax = fig.add_subplot(111)
 
@@ -123,13 +126,16 @@ def main_2(data, filename, path):
     surf_2 = ax.contour(X, Y, temp, cmap='magma',levels=20,alpha=0.7)
     ax.scatter(max_x,max_y, label = 'max value',color='green')
     ax.scatter(new_max_x,new_max_y,label='gaus max value', color='red')
-    
+
     # Customize the plot (labels, title, etc.) as needed
     ax.set_title('Location of Protostar - Gaussian Fit ' + filename, size = 8)
 
     ax.legend()
+
+    plt.savefig(fname = 'Protostar_Centre_Contour.png', bbox_inches = 'tight', dpi =600)
+
     plt.show()
-    
+
     return
 
 
