@@ -9,14 +9,15 @@ import numpy as np
 from scipy.constants import c
 
 ########## params ################
-calibration_freq = 220.70908  # GHz
-transition_freq = 220.538635 # GHz
-obs_freq = 220.517542       # GHz
-input_filename = 'C:/Users/nickl/linux/week7/trims/CH3CN_nopix_k=7.fits'
-output_filename = 'C:/Users/nickl/linux/week7/trims/CH3CN_cal_k=7.fits'
+#calibration_freq = 220.70908  # GHz
+transition_freq = 220.593987 # GHz
+obs_freq = 220.5725      # GHz
+input_filename = 'C:/Users/nickl/linux/week7/trims/CH3CN_nopix_k=6.fits'
+output_filename = 'C:/Users/nickl/linux/week7/trims/CH3CN_cal_k=6.fits'
 ####################################
 
-VELREF = (c/1000) * -(obs_freq - transition_freq) / transition_freq
+VELREF = round((c/1000) * -(obs_freq - transition_freq) / transition_freq, 2)
+print("new header will be", VELREF)
 #scale_factor = (c/1000) * (transition_freq - calibration_freq) / calibration_freq
 #print(scale_factor)
 
@@ -28,10 +29,11 @@ def change_header_info(input_fits_file, output_fits_file):
     with fits.open(input_fits_file) as hdul:
         data = hdul[0].data
         header = hdul[0].header
+        print("old header = ", header['VELREF'],  "\ninput file =", str(input_fits_file))
         # Update header values
         header['RESTFRQ'] = transition_freq * 10**9  # Converted to Hz
         header['VELREF'] = VELREF
-
+        print("output file = file =", str(output_fits_file))
         # Write the original data with the updated header to the output file
         fits.writeto(output_fits_file, data, header, overwrite=True)
 
