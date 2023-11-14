@@ -4,8 +4,8 @@ Created on Thu Nov 9 15:24:03 2023
 
 @author: nickl
 
-this code takes the second and third columns from rings_final2 (the Radius(arcsec) 
-and VROT(KM/S) columns) and plots them against a v prop r^(-0.5) rotation curve to 
+this code takes the second and third columns from rings_final2 (the Radius(arcsec)
+and VROT(KM/S) columns) and plots them against a v prop r^(-0.5) rotation curve to
 estimate the mass of a central body inhibiting keplarian motion on nearby gas/dust
 """
 
@@ -20,21 +20,23 @@ SunMass = 1.98847e30
 scale_factor_x =  8*10**3 * np.pi * pc / (3600 * 180) ## turns arcsec into m
 scale_factor_y = 1000 #turns km/s into m/s
 
-FOLDER = 'e_sma1_k7_good'
-
+FOLDER = 'e_sma1'
+FILEPATH = 'C:/Users/nickl/linux/prog/bbarolo/output/' #NICK
+# FILEPATH = 'C:/Users/christdick/linux/prog/bbarolo/output/' #NICK
 # Define the model function
 def model(x, A):
     return A * x**(-0.5)
 
 # Load the data from rings_final2.txt
-data = np.genfromtxt('C:/Users/nickl/linux/prog/bbarolo/output/'+FOLDER +'/rings_final2.txt', usecols=(1, 2), skip_header=1, unpack=True)
+data = np.genfromtxt(FILEPATH+FOLDER +'/rings_final2.txt', usecols=(1, 2), skip_header=1, unpack=True)
 
 # Unpack the radius and rotation velocity
 rad, vrot = data
-#print(rad)
+
 # Filter out zero (or close to zero) and negative radius values as they will cause issues in the model
-valid_indices = rad > 0
+valid_indices = (rad > 0) #| (rad > 0.028)
 rad = rad[valid_indices]
+print(rad)
 vrot = vrot[valid_indices]
 
 # Convert vrot to m/s for the second plot
@@ -87,3 +89,4 @@ ax2.legend()
 plt.savefig(fname = 'bbarolo_curve_fit.png', bbox_inches = 'tight', dpi = 866)
 # Display the plot
 plt.show()
+
