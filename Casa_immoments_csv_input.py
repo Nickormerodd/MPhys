@@ -2,6 +2,17 @@
 Created on Wed Nov  8 12:59:29 2023
 
 @author: Christopher
+
+This csv file has the following:
+1st column - file path to input file
+2nd column - file path to region file
+3rd coumn - channel range (format n-m)
+4th column - moments (in format 0,1,2,...,n)
+The first row isnt being read, so start from
+2nd row onwards.
+For any rows which you want the code to ignore,
+put a # infront of the file path in column 1.
+
 """
 
 import csv
@@ -19,7 +30,7 @@ def file_writing(name, chan_1, chan_2, rms, file_path, region_path, moments):
     subimage_path = f"{script_dir}/{name}_{chan_1}-{chan_2}.image"
     imsubimage(imagename=file_path,
                outfile=subimage_path,
-               chans=f"{chan_1}~{chan_2}",
+               chans=f"{chan_1}~{chan_2}" if chan_1 is not None and chan_2 is not None else "",
                overwrite=True)
 
     for moment in moments:
@@ -56,8 +67,12 @@ def process_csv(csv_file):
 
             file_path, region_path, channels_str, moments_str = row
 
-            # Convert channels string to a tuple of integers
-            chan_1, chan_2 = map(int, channels_str.split('-'))
+            # Check if channel range is to be ignored
+            if channels_str.startswith('#'):
+                chan_1, chan_2 = None, None
+            else:
+                # Convert channels string to a tuple of integers
+                chan_1, chan_2 = map(int, channels_str.split('-'))
 
             # Convert moments string to a list of integers
             moments = ast.literal_eval(f"[{moments_str}]")
