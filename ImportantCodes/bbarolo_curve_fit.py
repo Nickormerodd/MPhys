@@ -12,29 +12,53 @@ estimate the mass of a central body inhibiting keplarian motion on nearby gas/du
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
+from tkinter import Tk, filedialog
 
-# User-defined global scale factor
+########################### use variables ###################################
+SaveFigName='C:/Users/nickl/linux/Week7/MassEstimates/k=8,bbarolo_curve_fit1ag.png'
+min_rad = 0.03 #minimum radius in arcsec
+max_rad = 0.2 #maximum radius in arcecs (0.13"=1000AU)
+#############################################################################
+
+############################## global params ##################################
 pc = 3.086e+16
 G = 6.6743e-11
 SunMass = 1.98847e30
-scale_factor_x =  8*10**3 * np.pi * pc / (3600 * 180) ## turns arcsec into m
-scale_factor_y = 1000 #turns km/s into m/s
+scale_factor_x = 8*10**3 * np.pi * pc / (3600 * 180)  # turns arcsec into m
+scale_factor_y = 1000  # turns km/s into m/s
+#############################################################################
 
-FOLDER = 'e_sma1'
-FILEPATH = 'C:/Users/nickl/linux/prog/bbarolo/output/' #NICK
-# FILEPATH = 'C:/Users/christdick/linux/prog/bbarolo/output/' #NICK
+# file picking with a temp window
+root = Tk()
+root.attributes('-topmost', True)  # Set the window to be always on top
+
+# Prompt the user to select files, starting in the specified directory
+initial_dir = 'C:/Users/nickl/linux/prog/bbarolo/output/'
+file_path = filedialog.askopenfilename(initialdir=initial_dir,
+                                       title="Select Folder, then select rings_final2.txt")
+#removes temp window
+root.destroy()
+
 # Define the model function
 def model(x, A):
     return A * x**(-0.5)
 
-# Load the data from rings_final2.txt
-data = np.genfromtxt(FILEPATH+FOLDER +'/rings_final2.txt', usecols=(1, 2), skip_header=1, unpack=True)
+# Check if a file was selected
+if file_path:
+    # Load the data from the selected file
+    data = np.genfromtxt(file_path, usecols=(1, 2), skip_header=1, unpack=True)
+else:
+    print("No file selected.")
+    exit()
+
+# ... Rest of your code for plotting and analysis goes here ...
+
 
 # Unpack the radius and rotation velocity
 rad, vrot = data
 
 # Filter out zero (or close to zero) and negative radius values as they will cause issues in the model
-valid_indices = (rad > 0) #| (rad > 0.028)
+valid_indices = (rad > min_rad) & (rad < max_rad)
 rad = rad[valid_indices]
 print(rad)
 vrot = vrot[valid_indices]
@@ -49,11 +73,11 @@ initial_guess = [np.mean(vrot)]
 params, covariance = curve_fit(model, rad, vrot, p0=initial_guess, maxfev=10000)
 
 # Unpack the fitting parameters
-A = params[0]
+A = params[0] #sqrt(GM) = v * sqrt(r)
 #print(A)
 
 # Adjust A for the scaled x-axis
-A_scaled = A / scale_factor_x**(-0.5) * scale_factor_y
+A_scaled = A * scale_factor_y/ scale_factor_x**(-0.5)
 
 print(f'The value for A in the scaled plot, equal to sqrt(GM), is {A_scaled:.2e}')
 Mass = A_scaled**2 / G
@@ -86,7 +110,7 @@ ax2.set_title('SI Scaled Rotation Curve')
 ax2.grid(alpha=0.3)
 ax2.legend()
 
-plt.savefig(fname = 'bbarolo_curve_fit.png', bbox_inches = 'tight', dpi = 866)
+plt.savefig(fname = SaveFigName, bbox_inches = 'tight', dpi = 866)
 # Display the plot
 plt.show()
 
