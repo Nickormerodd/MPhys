@@ -21,7 +21,8 @@ velocities, with an uncertainty on the mean velocity equal to the
 standard deviation of the calculated velocities.
 
 A histogram of the velocities are then plotted on a graph, with a gaussian 
-plotted through them to show that the spread of the calculated velocities.
+plotted through them to show that the spread of the calculated velociti
+es.
 
 This code saves the figures created, so # that off if dont want figure saved.
 """
@@ -40,6 +41,7 @@ from matplotlib.ticker import FuncFormatter
 import uncertainties.unumpy as unp
 from uncertainties import ufloat
 from scipy.stats import norm
+from spectral_cube import DaskSpectralCube
 
 def get_data():
 
@@ -122,10 +124,11 @@ def answers(spectral):
     line_data = filter_data(spectral, val_1, val_2)
     line_data_gaus, params, covariance = gaus_fitting(line_data)
     #perr = np.sqrt(np.diag(covariance))
-    line_graph(line_data, line_data_gaus, params, molecule_name, covariance)
+    #rms = noise_rms(spectral)
+    f_rest = line_graph(line_data, line_data_gaus, params, molecule_name, covariance)
     decision = input('Velocity calculation? [y/n]\n')
     if decision=='y':
-        velocity = velocity_func(params[1], molecule_name)
+        velocity, v_err, f_rest = velocity_func(params, covariance, molecule_name, 0, f_rest)
     else:
         velocity = np.nan
     
@@ -168,9 +171,10 @@ def line_graph(data, gaus, params, name, covariance):
     fig = plt.figure()
     ax = fig.add_subplot(111)
     
-    low_uncert, up_uncert, mean_uncert = chi_uncertainty(data, gaus)
+    #low_uncert, up_uncert, mean_uncert = chi_uncertainty(data, gaus)
+    red_chi = chi_uncert(data, gaus)
     
-    ax.errorbar(data[:,2], data[:,1], yerr=float(mean_uncert), linewidth = 1, 
+    ax.errorbar(data[:,2], data[:,1], yerr=0.154, linewidth = 1, 
                 label='Data', fmt='x')
     ax.set_title(name)
     ax.set_xlabel('Frequency, GHz')
@@ -181,6 +185,8 @@ def line_graph(data, gaus, params, name, covariance):
     
     amp, mean, std_dev = params
     perr = np.sqrt(np.diag(covariance))
+    amp_err = perr[0]
+    velocity, v_err, f_rest = velocity_func(params, covariance, name, 1, 0)
     
     y_mean = np.linspace(min(data[:,1]), max(data[:,1])-np.mean(data[:,1])*0.2, 2)
     x_mean = np.linspace(mean,mean,2)
@@ -207,7 +213,17 @@ def line_graph(data, gaus, params, name, covariance):
     ax.plot([],[], color='black', label= r'$\sigma_{std}$ = ' + str(std_formatted) + ' GHz',
             linewidth=1)
     ax.plot(x_std_2,y_std_2,color='grey',linestyle='--',linewidth=1)
+    #ax.plot([],[],alpha=0, label = '$\chi^2_{red}$ = ' + str('{:.1f}'.format(red_chi)))
     
+    ax.annotate(r'$\chi^2_{red}$ = ' + str('{:.1f}'.format(red_chi)),
+                xy=(0.5, 0.5), xytext=(0, -145), 
+                xycoords='axes fraction', textcoords='offset points', fontsize=11,
+                ha='center', va='top')
+    ax.annotate(r'$v_{rad} = $' + str('{:.2f}'.format(velocity*10**(-3))) + ' $\pm$ '+ str('{:.2f}'.format(v_err) + ' kms$^{-1}$'),
+                xy=(0.5, 0.5), xytext=(0, -162), 
+                xycoords='axes fraction', textcoords='offset points', fontsize=11,
+                ha='center', va='top')
+    """
     ax.annotate(r'For 0.5$\leq$$\chi^2_{red}$$\leq$1.5 $\Longrightarrow$ ' + str(low_uncert) + '$\leq$$\sigma_{data}$$\leq$' + str(up_uncert),
                 xy=(0.5, 0.5), xytext=(0, -145), 
                 xycoords='axes fraction', textcoords='offset points', fontsize=11,
@@ -217,7 +233,7 @@ def line_graph(data, gaus, params, name, covariance):
                 xy=(0.5, 0.5), xytext=(0, -162), 
                 xycoords='axes fraction', textcoords='offset points', fontsize=11,
                 ha='center', va='top')
-    
+    """
     def format_func(x, _):
         return '{:.3f}'.format(x)
     ax.xaxis.set_major_formatter(FuncFormatter(format_func))
@@ -230,9 +246,9 @@ def line_graph(data, gaus, params, name, covariance):
     
     name = ((name.replace('$','')).replace(' ','')).replace("\\rightarrow","")
     
-    plt.savefig('Gaussian_CH3CN_'+str(name) + '.png', dpi=1000, bbox_inches='tight')
+    #plt.savefig('Gaussian_CH3CN_'+str(name) + '.png', dpi=1000, bbox_inches='tight')
     
-    return
+    return f_rest
 
 
 def gaussian(x, amplitude, mean, std_dev):
@@ -253,6 +269,7 @@ def gaus_fitting(data):
         try:
             params, covariance = curve_fit(gaussian, data[:,2], data[:,1],
                                            p0=GUESS, absolute_sigma=True,
+                                           sigma = np.linspace(0.154,0.154,len(data)),
                                            maxfev=2000)
         except ValueError or RuntimeWarning:
             break
@@ -274,13 +291,18 @@ def filter_data(data, val_1, val_2):
     
     return filtered_data
 
-def velocity_func(f_obs, name):
+def velocity_func(params, cov, name, n, f_rest):
     
-    f_rest = float(input('What is the rest frequency in GHz for '+str(name)+'\n'))
+    f_obs = params[1]
+    f_obs_err = np.sqrt(np.diag(cov))[1]
+    if n==1: 
+        f_rest = float(input('What is the rest frequency in GHz for '+str(name)+'\n'))
     velocity = c*(f_rest-f_obs)/f_rest
-    print('v_radial_'+ str(name) + ' = ' + str(velocity*10**(-3)) + ' km/s')
+    v_err = c*f_obs_err/f_rest * 10**(-3)
+    if n==0:
+        print('v_radial_'+ str(name) + ' = ' + str(velocity*10**(-3)) +f' +/- {v_err}' + ' km/s')
     
-    return velocity
+    return velocity, v_err, f_rest
 
 def final_velocity(data):
     print('\n')
@@ -318,6 +340,13 @@ def chi_uncertainty(data, gaus):
     print('Mean uncertainty = ' + str(mean_uncert) + ' K')
     
     return lower_uncert, upper_uncert, mean_uncert
+
+def chi_uncert(data, gaus):
+    
+    chi_squared = sum((data[:,1] - gaus)**2)/0.154
+    red_chi = chi_squared/(len(data)-1)
+    
+    return red_chi
 
 def velocity_graph(velocities, std):
     
@@ -370,8 +399,9 @@ def velocity_graph(velocities, std):
     print("\nWeighted final velocity = ",
           "{} +/- {} km/s".format(params[1], params[2]))
         
-    plt.savefig('Weighted_velocity_distribution.png', dpi=1000, bbox_inches='tight')
+    #plt.savefig('Weighted_velocity_distribution.png', dpi=1000, bbox_inches='tight')
     
     return
+
 
 get_data()
