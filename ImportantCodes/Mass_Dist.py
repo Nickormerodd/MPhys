@@ -21,9 +21,10 @@ from scipy.optimize import curve_fit
 from tkinter import Tk, filedialog
 
 ########################### use variables ###################################
-SaveFigName = 'C:/Users/nickl/linux/Week7/MassEstimates/MassDist.png'
-SaveFig = False
-initial_dir = 'C:/Users/nickl/linux/prog/bbarolo/output/' #where is your rings_final2.txt file
+SaveFigName1 = 'C:/Users/Christopher/OneDrive/Documents/4th_year_physics/MPhys_Project/Week_7-9/Velocity_distance/BBarolo_curve.png' #initial plot
+SaveFigName2 = 'C:/Users/Christopher/OneDrive/Documents/4th_year_physics/MPhys_Project/Week_7-9/Velocity_distance/BBarolo_MassDist.png' #AU plot
+SaveFig = True
+initial_dir = 'C:/Users/christopher/' #where is your rings_final2.txt file
 min_rad = 0.03  # minimum radius in arcsec
 max_rad = 1  # maximum radius in arcsec (0.13"=1000AU) #0.2 gets rid of last point
 doi = 1/2 #times all the vdisps by this value
@@ -88,10 +89,10 @@ def perform_curve_fitting(rad, vrot, rad1, vrot1, vdisp, vdisp1, vrot_err,vrot1_
     params2, cov2 = curve_fit(model, rad, vrot - vdisp*doi, p0=initial_guess,
                               sigma=vrot_err, absolute_sigma = True,maxfev=10000)
 
-    params3, cov3 =curve_fit(model, rad1, vrot + vdisp*doi, p0=initial_guess,
+    params3, cov3 =curve_fit(model, rad, vrot + vdisp*doi, p0=initial_guess,
                              sigma=vrot_err, absolute_sigma = True,maxfev=10000)
 
-    params4, cov4 = curve_fit(non_keplarian_model, rad, vrot, p0=initial_guess_free,
+    params4, cov4 = curve_fit(non_keplarian_model, rad1, vrot1, p0=initial_guess_free,
                                      sigma=vrot1_err, absolute_sigma=True, maxfev=10000)
 
     A_ac = Params[0]
@@ -109,19 +110,23 @@ def plot_initial(rad, vrot, vrot_err, rad1, vrot1, vrot1_err, A_ac, A_low, A_hig
     rad_fine = np.linspace(np.min(rad), np.max(rad), 1000)
 
     # Create a figure with two subplots, sharing the y-axis
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
+    plt.figure(figsize=(10,6))
     # First subplot: original data
-    ax.errorbar(rad, vrot, yerr= vrot_err*doi, fmt='o', color='green', label='Model data')
-    ax.errorbar(rad1, vrot1, yerr= vrot1_err*doi, fmt='o', color='red', label='Obs data')
-    ax.plot(rad_fine, model(rad_fine, A_ac), '--', color='green', label=f'Keplarian Fit: ${A_ac:.3f} \cdot r^{{ -0.5}}$')
-    ax.plot(rad_fine, non_keplarian_model(rad_fine, A_f, n), '--', color='red', label=f'Model Fit: ${A_f:.3f} \cdot r^{{n}}$'+f'\nn = ${n:.3f}$')
+    plt.errorbar(rad, vrot, yerr= vrot_err*doi, fmt='o', color='green', label='Model data')
+    plt.errorbar(rad1, vrot1, yerr= vrot1_err*doi, fmt='o', color='red', label='Obs data')
+    plt.plot(rad_fine, model(rad_fine, A_ac), '--', color='green', label=f'Keplarian Fit: ${A_ac:.3f} \cdot r^{{ -0.5}}$')
+    plt.plot(rad_fine, non_keplarian_model(rad_fine, A_f, n), '--', color='red', label=f'n = ${n:.3f}$')
 
-    ax.set_xlabel('Radius (arcsec)')
-    ax.set_ylabel('Rotation Velocity (km/s)')
-    ax.set_title('3DBbarolo Rotation Curve')
-    ax.grid(alpha=0.3)
-    ax.legend()
+    plt.xlabel('Radius (arcsec)')
+    plt.ylabel('Rotation Velocity (km/s)')
+    plt.title('3DBbarolo Rotation Curve')
+    plt.grid(alpha=0.3)
+    plt.legend()
+    
+    if SaveFig:
+        plt.savefig(fname=SaveFigName1, bbox_inches='tight', dpi=866)
+
+    plt.show()
 
 def scaling_to_si1(rad, vrot, vdisp, vrot_err, A_f, A_f_err, n):
 
@@ -163,7 +168,7 @@ def plot_curve(rad, vrot, vrot_err, rad1, vrot1, vrot1_err, A_ac, A_ac_err, A_lo
     plt.legend()
 
     if SaveFig:
-        plt.savefig(fname=SaveFigName, bbox_inches='tight', dpi=866)
+        plt.savefig(fname=SaveFigName2, bbox_inches='tight', dpi=866)
 
     plt.show()
 
@@ -195,4 +200,3 @@ def execute():
 
 # Execute the code
 execute()
-
