@@ -24,8 +24,8 @@ from tkinter import Tk, filedialog
 SaveFigName = 'C:/Users/nickl/linux/Week7/MassEstimates/MassDist.png'
 SaveFig = False
 initial_dir = 'C:/Users/nickl/linux/prog/bbarolo/output/' #where is your rings_final2.txt file
-min_rad = 0  # minimum radius in arcsec
-max_rad = 0.5  # maximum radius in arcsec (0.13"=1000AU) #0.2 gets rid of last point
+min_rad = 0.03  # minimum radius in arcsec
+max_rad = 1  # maximum radius in arcsec (0.13"=1000AU) #0.2 gets rid of last point
 doi = 1/2 #times all the vdisps by this value
 #############################################################################
 
@@ -50,38 +50,42 @@ def get_data(initial_dir):
 
     file_path1 = file_path.replace('rings_final2.txt', 'rings_final1.txt')
 
-    data_ours = np.genfromtxt(file_path1, usecols=(1, 2, 3), skip_header=1, unpack=True)
-    data_bbarolo = np.genfromtxt(file_path, usecols=(1, 2, 3), skip_header=1, unpack=True)
+    data_ours = np.genfromtxt(file_path1, usecols=(1, 2, 3, 14), skip_header=1, unpack=True)
+    data_bbarolo = np.genfromtxt(file_path, usecols=(1, 2, 3,14), skip_header=1, unpack=True)
 
 
     return data_bbarolo, data_ours
 
 def validate(data):
 
-    rad, vrot, vdisp = data
+    rad, vrot, vdisp, verr = data
 
     valid_indices = (rad > min_rad) & (rad < max_rad) # validation of data
 
     rad = rad[valid_indices]
     vrot = vrot[valid_indices]
     vdisp = vdisp[valid_indices]
+    verr = verr[valid_indices]
 
-    return rad, vrot, vdisp
+    return rad, vrot, vdisp, verr
 
 def model(x, A):
     return A * x**(-0.5)
 
-def perform_curve_fitting(rad, vrot, rad1, vrot1, vdisp, vdisp1):
+def perform_curve_fitting(rad, vrot, rad1, vrot1, vdisp, vdisp1, vrot_err):
 
     initial_guess = [np.mean(vrot)]
 
     # Fit the Keplerian model to the data
-    Params, cov = curve_fit(model, rad, vrot, p0=initial_guess, maxfev=10000)
+    Params, cov = curve_fit(model, rad, vrot, p0=initial_guess, sigma=vrot_err,
+                            absolute_sigma = True, maxfev=10000)
 
     # Fit the non-Keplerian model to the data
-    params2, cov2 = curve_fit(model, rad, vrot - vdisp*doi, p0=initial_guess, maxfev=10000)
+    params2, cov2 = curve_fit(model, rad, vrot - vdisp*doi, p0=initial_guess,
+                              sigma=vrot_err, absolute_sigma = True,maxfev=10000)
 
-    params3, cov3 =curve_fit(model, rad1, vrot + vdisp*doi, p0=initial_guess, maxfev=10000)
+    params3, cov3 =curve_fit(model, rad1, vrot + vdisp*doi, p0=initial_guess,
+                             sigma=vrot_err, absolute_sigma = True,maxfev=10000)
 
     A_ac = Params[0]
     A_ac_err = np.sqrt(cov[0, 0])
@@ -91,7 +95,7 @@ def perform_curve_fitting(rad, vrot, rad1, vrot1, vdisp, vdisp1):
     A_high_err = np.sqrt(np.diag(cov3))[0]
     return A_ac, A_ac_err, A_low, A_low_err, A_high, A_high_err
 
-def plot_initial(rad, vrot, vdisp, A_ac, A_low, A_high):
+def plot_initial(rad, vrot, vrot_err, rad1, vrot1, vrot1_err, A_ac, A_low, A_high):
     # Create a finer array for plotting the smooth curve
     rad_fine = np.linspace(np.min(rad), np.max(rad), 1000)
 
@@ -99,8 +103,9 @@ def plot_initial(rad, vrot, vdisp, A_ac, A_low, A_high):
     fig = plt.figure()
     ax = fig.add_subplot(111)
     # First subplot: original data
-    ax.errorbar(rad, vrot, yerr= vdisp*doi, fmt='o', color='blue', label='Rotation Velocity')
-    ax.plot(rad_fine, model(rad_fine, A_ac), '-', color='red', label=f'Keplarian Fit: ${A_ac:.3f} \cdot r^{{ -0.5}}$')
+    ax.errorbar(rad, vrot, yerr= vrot_err*doi, fmt='o', color='blue', label='Model data')
+    ax.errorbar(rad1, vrot1, yerr= vrot1_err*doi, fmt='o', color='red', label='Model data')
+    ax.plot(rad_fine, model(rad_fine, A_ac), '-', color='green', label=f'Keplarian Fit: ${A_ac:.3f} \cdot r^{{ -0.5}}$')
 
     ax.set_xlabel('Radius (arcsec)')
     ax.set_ylabel('Rotation Velocity (km/s)')
@@ -108,20 +113,21 @@ def plot_initial(rad, vrot, vdisp, A_ac, A_low, A_high):
     ax.grid(alpha=0.3)
     ax.legend()
 
-def scaling_to_si1(rad, vrot, vdisp):
+def scaling_to_si1(rad, vrot, vdisp, vrot_err):
 
     rad_s = rad * scale_factor_x
     vrot_s = vrot * scale_factor_y
-    vdisp_s = vdisp* scale_factor_y/2
-    return rad_s, vrot_s, vdisp_s
+    vdisp_s = vdisp* scale_factor_y
+    vrot_err_s = vrot_err * scale_factor_y
+
+    return rad_s, vrot_s, vdisp_s, vrot_err_s
 
 def scaling_to_si2(data):
     data_s = data * scale_factor_y/ scale_factor_x**(-0.5)
     return data_s
 
-def plot_curve(rad, vrot, vdisp, A_ac, A_ac_err, A_low, A_low_err, A_high, A_high_err):
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
+def plot_curve(rad, vrot, vrot_err, rad1, vrot1, vrot1_err, A_ac, A_ac_err, A_low, A_low_err, A_high, A_high_err):
+    plt.figure(figsize=(10,6))
     rad_fine = np.linspace(np.min(rad), np.max(rad), 1000)
     SMass = A_ac**2 / (G * SunMass)
     SMass_low = A_low**2 / (G * SunMass)
@@ -131,37 +137,38 @@ def plot_curve(rad, vrot, vdisp, A_ac, A_ac_err, A_low, A_low_err, A_high, A_hig
     SMass_low_err = ((2*A_low / G)**2 *(A_low_err)**2)**(1/2) / SunMass
     SMass_high_err = ((2*A_high / G)**2 *(A_high_err)**2)**(1/2) / SunMass
 
-    ax.plot(rad /AU, vrot/1000,'o', color='indigo', label = 'Model data')
-    ax.plot(rad_fine/AU, model(rad_fine, A_ac)/1000, '--', color='indigo', label = f'model M={SMass:.2f} +/- {SMass_err:.2f}'+' $M_{\cdot}$')
-    ax.plot(rad_fine/AU, model(rad_fine, A_low)/1000, '-', color='red', label = f'low M={SMass_low:.2f} +/- {SMass_low_err:.2f}'+' $M_{\cdot}$')
-    ax.plot(rad_fine/AU, model(rad_fine, A_high)/1000, '-', color='green', label = f'high M={SMass_high:.2f} +/- {SMass_high_err:.2f}'+' $M_{\cdot}$')
+    plt.errorbar(rad /AU, vrot/1000, yerr = vrot_err/1000,fmt ='o', color='green', label = 'Model data')
+    plt.errorbar(rad1 /AU, vrot1/1000, yerr = vrot1_err/1000,fmt ='o', color='indigo', label = 'Observed data')
+    plt.plot(rad_fine/AU, model(rad_fine, A_ac)/1000, '--', color='green', label = f'model M={SMass:.2f} +/- {SMass_err:.2f}'+' $M_{\cdot}$')
+    plt.plot(rad_fine/AU, model(rad_fine, A_low)/1000, '-', color='red', label = f'low M={SMass_low:.2f} +/- {SMass_low_err:.2f}'+' $M_{\cdot}$')
+    plt.plot(rad_fine/AU, model(rad_fine, A_high)/1000, '-', color='blue', label = f'high M={SMass_high:.2f} +/- {SMass_high_err:.2f}'+' $M_{\cdot}$')
 
-    ax.set_xlabel('Radius (AU)')
-    ax.set_ylabel('Rotation Velocity (km/s)')
-    ax.set_title('SI Scaled Rotation Curve')
-    ax.grid(alpha=0.3)
-    ax.legend(fontsize=9)
+    plt.xlabel('Radius (AU)')
+    plt.ylabel('Rotation Velocity (km/s)')
+    plt.title('SI Scaled Rotation Curve')
+    plt.grid(alpha=0.3)
+    plt.legend()
 
     if SaveFig:
         plt.savefig(fname=SaveFigName, bbox_inches='tight', dpi=866)
 
     plt.show()
-    return SMass, SMass_low, SMass_high
 
 def execute():
 
     data_bbarolo, data_ours = get_data(initial_dir)
 
-    rad, vrot, vdisp = validate(data_bbarolo) #returns rad,vrot
-    rad1,vrot1, vdisp1 = validate(data_ours)
+    rad, vrot, vdisp, vrot_err = validate(data_bbarolo) #returns rad,vrot
+    rad1,vrot1, vdisp1, vrot1_err = validate(data_ours)
 
     #print(vdisp)
     # Plot the data and fit
-    A_ac, A_ac_err, A_low, A_low_err, A_high, A_high_err = perform_curve_fitting(rad, vrot, rad1, vrot1, vdisp, vdisp1)
-    plot_initial(rad, vrot, vdisp, A_ac, A_low, A_high)
+    A_ac, A_ac_err, A_low, A_low_err, A_high, A_high_err = perform_curve_fitting(rad, vrot, rad1, vrot1, vdisp, vdisp1, vrot_err)
+    plot_initial(rad, vrot, vrot_err, rad1, vrot1, vrot1_err, A_ac, A_low, A_high)
 
     #scaling
-    rad_s, vrot_s, vdisp_s = scaling_to_si1(rad, vrot, vdisp)
+    rad_s, vrot_s, vdisp_s, vrot_err_s = scaling_to_si1(rad, vrot, vdisp, vrot_err)
+    rad1_s, vrot1_s, vdisp1_s, vrot1_err_s= scaling_to_si1(rad1, vrot1, vdisp1, vrot1_err)
     A_ac_s= scaling_to_si2(A_ac)
     A_ac_err_s = scaling_to_si2(A_ac_err)
     A_low_s= scaling_to_si2(A_low)
@@ -169,7 +176,8 @@ def execute():
     A_high_s= scaling_to_si2(A_high)
     A_high_err_s = scaling_to_si2(A_high_err)
 
-    SMass, SMass_low, SMass_high = plot_curve(rad_s, vrot_s, vdisp, A_ac_s, A_ac_err_s, A_low_s, A_low_err_s, A_high_s, A_high_err_s)
+    plot_curve(rad_s, vrot_s, vrot_err_s, rad1_s, vrot1_s, vrot1_err_s, A_ac_s,
+               A_ac_err_s, A_low_s, A_low_err_s, A_high_s, A_high_err_s)
 
 # Execute the code
 execute()
