@@ -21,13 +21,14 @@ from scipy.optimize import curve_fit
 from tkinter import Tk, filedialog
 
 ########################### use variables ###################################
-SaveFigName1 = 'C:/Users/Christopher/OneDrive/Documents/4th_year_physics/MPhys_Project/Week_7-9/Velocity_distance/BBarolo_curve.png' #initial plot
-SaveFigName2 = 'C:/Users/Christopher/OneDrive/Documents/4th_year_physics/MPhys_Project/Week_7-9/Velocity_distance/BBarolo_MassDist.png' #AU plot
+SaveFigName1 = 'C:/Users/nickl/linux/Week7/MassEstimates/InitialCurve.png'
+SaveFigName2 = 'C:/Users/nickl/linux/Week7/MassEstimates/ScaledCurve.png'
 SaveFig = True
-initial_dir = 'C:/Users/christopher/' #where is your rings_final2.txt file
+initial_dir = 'C:/Users/nickl/linux/prog/bbarolo/output/' #where is your rings_final2.txt file
 min_rad = 0.03  # minimum radius in arcsec
 max_rad = 1  # maximum radius in arcsec (0.13"=1000AU) #0.2 gets rid of last point
-doi = 1/2 #times all the vdisps by this value
+doi = 1 #times all the vdisps by this value
+doiv = 1 #times all v_errs by this value
 #############################################################################
 
 ############################## global params ##################################
@@ -82,18 +83,18 @@ def perform_curve_fitting(rad, vrot, rad1, vrot1, vdisp, vdisp1, vrot_err,vrot1_
     initial_guess_free = [np.mean(vrot), -0.5]
 
     # Fit the Keplerian model to the data
-    Params, cov = curve_fit(model, rad, vrot, p0=initial_guess, sigma=vrot_err,
+    Params, cov = curve_fit(model, rad, vrot, p0=initial_guess, sigma=vrot_err*doiv,
                             absolute_sigma = True, maxfev=10000)
 
     # Fit the non-Keplerian model to the data
     params2, cov2 = curve_fit(model, rad, vrot - vdisp*doi, p0=initial_guess,
-                              sigma=vrot_err, absolute_sigma = True,maxfev=10000)
+                              sigma=vrot_err*doiv, absolute_sigma = True,maxfev=10000)
 
     params3, cov3 =curve_fit(model, rad, vrot + vdisp*doi, p0=initial_guess,
-                             sigma=vrot_err, absolute_sigma = True,maxfev=10000)
+                             sigma=vrot_err*doiv, absolute_sigma = True,maxfev=10000)
 
     params4, cov4 = curve_fit(non_keplarian_model, rad1, vrot1, p0=initial_guess_free,
-                                     sigma=vrot1_err, absolute_sigma=True, maxfev=10000)
+                                     sigma=vrot1_err*doiv, absolute_sigma=True, maxfev=10000)
 
     A_ac = Params[0]
     A_ac_err = np.sqrt(cov[0, 0])
@@ -112,19 +113,19 @@ def plot_initial(rad, vrot, vrot_err, rad1, vrot1, vrot1_err, A_ac, A_low, A_hig
     # Create a figure with two subplots, sharing the y-axis
     plt.figure(figsize=(10,6))
     # First subplot: original data
-    plt.errorbar(rad, vrot, yerr= vrot_err*doi, fmt='o', color='green', label='Model data')
-    plt.errorbar(rad1, vrot1, yerr= vrot1_err*doi, fmt='o', color='red', label='Obs data')
+    plt.errorbar(rad, vrot, yerr= vrot_err*doiv, fmt='o', color='green', label='Model data')
+    plt.errorbar(rad1, vrot1, yerr= vrot1_err*doiv, fmt='o', color='indigo', label='Obs data')
     plt.plot(rad_fine, model(rad_fine, A_ac), '--', color='green', label=f'Keplarian Fit: ${A_ac:.3f} \cdot r^{{ -0.5}}$')
-    plt.plot(rad_fine, non_keplarian_model(rad_fine, A_f, n), '--', color='red', label=f'n = ${n:.3f}$')
+    plt.plot(rad_fine, non_keplarian_model(rad_fine, A_f, n), '--', color='indigo', label=f'Model Fit: ${A_f:.3f} \cdot r^{{n}}$'+f'\nn = ${n:.3f} +/- {n_err:.3f}$')
 
-    plt.xlabel('Radius (arcsec)')
-    plt.ylabel('Rotation Velocity (km/s)')
-    plt.title('3DBbarolo Rotation Curve')
+    plt.xlabel('Radius (arcsec)', fontsize =12)
+    plt.ylabel('Rotation Velocity (km/s)', fontsize = 12)
+    plt.title('3DBbarolo Rotation Curve', fontsize = 15)
     plt.grid(alpha=0.3)
-    plt.legend()
-    
+    plt.legend(fontsize=12)
+
     if SaveFig:
-        plt.savefig(fname=SaveFigName1, bbox_inches='tight', dpi=866)
+        plt.savefig(fname=SaveFigName1, bbox_inches='tight', dpi=400)
 
     plt.show()
 
@@ -143,32 +144,38 @@ def scaling_to_si2(data):
     data_s = data * scale_factor_y/ scale_factor_x**(-0.5)
     return data_s
 
-def plot_curve(rad, vrot, vrot_err, rad1, vrot1, vrot1_err, A_ac, A_ac_err, A_low, A_low_err, A_high, A_high_err, A_f, A_f_err, n, n_err):
+def plot_curve(rad, vrot, vrot_err, rad1, vrot1, vrot1_err, A_ac, A_ac_err, A_low, A_low_err, A_high, A_high_err, A_f, A_f_err, n, n_err, vdisp):
     plt.figure(figsize=(10,6))
     rad_fine = np.linspace(np.min(rad), np.max(rad), 1000)
     SMass = A_ac**2 / (G * SunMass)
-    SMass_low = A_low**2 / (G * SunMass)
+    #SMass_low = A_low**2 / (G * SunMass)
     SMass_high = A_high**2 / (G * SunMass)
 
     SMass_err = ((2*A_ac / G)**2 *(A_ac_err)**2)**(1/2) / SunMass
-    SMass_low_err = ((2*A_low / G)**2 *(A_low_err)**2)**(1/2) / SunMass
+    #SMass_low_err = ((2*A_low / G)**2 *(A_low_err)**2)**(1/2) / SunMass
     SMass_high_err = ((2*A_high / G)**2 *(A_high_err)**2)**(1/2) / SunMass
 
-    plt.errorbar(rad /AU, vrot/1000, yerr = vrot_err/1000,fmt ='o', color='green', label = 'Model data')
-    plt.errorbar(rad1 /AU, vrot1/1000, yerr = vrot1_err/1000,fmt ='o', color='indigo', label = 'Observed data')
-    plt.plot(rad_fine/AU, non_keplarian_model(rad_fine, A_f, n)/1000, '--', color='indigo', label = f'Free fit n= {n:.2f} +/- {n_err:.2f}')
-    plt.plot(rad_fine/AU, model(rad_fine, A_ac)/1000, '--', color='green', label = f'model M={SMass:.2f} +/- {SMass_err:.2f}'+' $M_{\cdot}$')
-    plt.plot(rad_fine/AU, model(rad_fine, A_low)/1000, '-', color='red', label = f'low M={SMass_low:.2f} +/- {SMass_low_err:.2f}'+' $M_{\cdot}$')
-    plt.plot(rad_fine/AU, model(rad_fine, A_high)/1000, '-', color='blue', label = f'high M={SMass_high:.2f} +/- {SMass_high_err:.2f}'+' $M_{\cdot}$')
+    plt.errorbar(rad /AU, vrot/1000, yerr = vrot_err/1000*doiv,fmt ='o', color='green', label = 'Model data')
+    plt.errorbar(rad1 /AU, vrot1/1000, yerr = vrot1_err/1000*doiv,fmt ='o', color='indigo', label = 'Observed data')
 
-    plt.xlabel('Radius (AU)')
-    plt.ylabel('Rotation Velocity (km/s)')
-    plt.title('SI Scaled Rotation Curve')
+    plt.plot(rad_fine/AU, non_keplarian_model(rad_fine, A_f, n)/1000, '--', color='indigo', label = f'Free fit n= {n:.2f} +/- {n_err:.2f}')
+    plt.plot(rad_fine/AU, model(rad_fine, A_ac)/1000, '-', color='green', label = f'model M={SMass:.2f}'+' $M_{\odot}$') #+/- {SMass_err:.2f}
+    #plt.plot(rad_fine/AU, model(rad_fine, A_low)/1000, '-', color='red', label = f'low M={SMass_low:.2f} +/- {SMass_low_err:.2f}'+' $M_{\cdot}$')
+    #plt.plot(rad_fine/AU, model(rad_fine, A_high)/1000, '--', color='red', label = f'high M={SMass_high:.2f} +/- {SMass_high_err:.2f}'+' $M_{\cdot}$')
+    Low = SMass - SMass_err
+    High = SMass_high+ SMass_high_err
+
+    plt.plot([], [], label=f'{Low:.2f} '+'$ M_{\odot}$'+f' < M < {High:.2f}'+' $M_{\odot}$', alpha = 0)
+    #plt.plot([], [], label = r'$M={:.2f}^{{+{:.2f}}}_{{-{:.2f}}}\,M_\odot$'.format(SMass, High, Low), alpha = 0)
+
+    plt.xlabel('Radius (AU)', fontsize = 12)
+    plt.ylabel('Rotation Velocity (km/s)', fontsize = 12)
+    plt.title('Rotation Curve CH3CN: $J_{k}=12_{7}-11_{7}$', fontsize = 15)
     plt.grid(alpha=0.3)
-    plt.legend()
+    plt.legend(fontsize = 12)
 
     if SaveFig:
-        plt.savefig(fname=SaveFigName2, bbox_inches='tight', dpi=866)
+        plt.savefig(fname=SaveFigName2, bbox_inches='tight', dpi=400)
 
     plt.show()
 
@@ -196,7 +203,8 @@ def execute():
 
     plot_curve(rad_s, vrot_s, vrot_err_s, rad1_s, vrot1_s, vrot1_err_s, A_ac_s,
                A_ac_err_s, A_low_s, A_low_err_s, A_high_s, A_high_err_s,
-               A_f_s, A_f_err_s, n, n_err)
+               A_f_s, A_f_err_s, n, n_err, vdisp_s)
 
 # Execute the code
 execute()
+
