@@ -129,6 +129,14 @@ def plot_initial(rad, vrot, vrot_err, rad1, vrot1, vrot1_err, A_ac, A_low, A_hig
 
     plt.show()
 
+def chi_squared(data, model, uncert, num_params):
+    #print(data, model)
+    residuals = (data - model) / uncert  # Element-wise division
+    chi_squared = np.sum(residuals**2)
+    degrees_of_freedom = len(data) - num_params
+    reduced_chi_squared = chi_squared / degrees_of_freedom
+    return reduced_chi_squared
+
 def scaling_to_si1(rad, vrot, vdisp, vrot_err, A_f, A_f_err, n):
 
     rad_s = rad * scale_factor_x
@@ -201,10 +209,13 @@ def execute():
     A_high_s= scaling_to_si2(A_high)
     A_high_err_s = scaling_to_si2(A_high_err)
 
+    reduced_chi_squared = chi_squared(vrot1_s, model(rad_s, A_ac_s), vrot1_err_s, 1)
+    print(f'{reduced_chi_squared:.3f}')
     plot_curve(rad_s, vrot_s, vrot_err_s, rad1_s, vrot1_s, vrot1_err_s, A_ac_s,
                A_ac_err_s, A_low_s, A_low_err_s, A_high_s, A_high_err_s,
                A_f_s, A_f_err_s, n, n_err, vdisp_s)
 
 # Execute the code
 execute()
+
 
