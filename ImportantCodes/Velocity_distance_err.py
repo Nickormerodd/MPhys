@@ -2,12 +2,6 @@
 Created on Tue Nov 21 12:52:59 2023
 
 @author: Christopher
-
-Input moment1. It iterates through loads of phi, 
-finds phi, i which minimises n. plots keplarian.
-plots keplarian > 250AU.
-Calculates mass.
-It calculates all the uncertainties. 
 """
 
 import numpy as np
@@ -46,7 +40,7 @@ def main(data,name,file_path):
     
     valid_indices = (data[0].data < (np.nanmean(data[0].data - 0.4))) | (data[0].data > (np.nanmean(data[0].data + 0.4)))
     data[0].data[~valid_indices] = np.nan
-    #print(np.max(data[0].data))     
+    #print(np.nanmean(data[0].data))     
                               
                             
     data[0].data = data[0].data - np.nanmean(data[0].data)
@@ -77,10 +71,10 @@ def main(data,name,file_path):
 
 def main_3(amended_data, x_norm, y_norm, name):
     
-    phi = np.deg2rad(155.87468671679198)
-    phi_err = np.deg2rad(2)
-    i = np.deg2rad(38.97435897435898)
-    i_err = np.deg2rad(4)
+    phi = np.deg2rad(156.06060606060606)
+    phi_err = np.deg2rad(1)
+    i = np.deg2rad(34)
+    i_err = np.deg2rad(2)
     
     
     r_err, r, theta_err, theta = x_y_uncertainty(x_norm, y_norm, phi, phi_err)
@@ -95,8 +89,8 @@ def main_3(amended_data, x_norm, y_norm, name):
     result = np.vstack((r_flat,v_r_flat,r_err_flat,v_r_err_flat)).T
     result = no_nan(result)
     result = trimming(result)
-    result = result[result[:, 0].argsort()]
-    main_4(result,phi,i)
+    #result = result[result[:, 0].argsort()]
+    #main_4(result,phi,i)
     #print(result)
     return
 
@@ -117,11 +111,13 @@ def main_4(result, phi, inc):
     i_deg = '{:.1f}'.format(np.rad2deg(inc))
     phi_deg = '{:.1f}'.format(np.rad2deg(phi))
     
-    result_2 = trimmerz(result)
+    result_2 = trimmerz(result, 250, np.inf)
     result_2 = result_2[result_2[:, 0].argsort()]
     
     param_2, cov_2 = fitting_data(power_law, result_2, 0)
     params_k_2, covariance_k_2 = fitting_data(keplarian_fit,result_2, 0)
+    
+    #result_3 = trimmerz(result)
     
     plotting(result, param, cov, params_k, covariance_k, phi_deg, i_deg, 
              param_2, cov_2,params_k_2, covariance_k_2)
@@ -130,10 +126,10 @@ def main_4(result, phi, inc):
 
 def main_5(data, x_norm,y_norm):
     
-    incerz = np.linspace(np.deg2rad(32), np.deg2rad(38), 5)
-    posizers = np.linspace(np.deg2rad(145), np.deg2rad(170), 100)
-    phi_err = np.deg2rad(2)
-    i_err = np.deg2rad(4)
+    incerz = np.linspace(np.deg2rad(32), np.deg2rad(35), 5)
+    posizers = np.linspace(np.deg2rad(120), np.deg2rad(200), 100)
+    phi_err = np.deg2rad(1.2)
+    i_err = np.deg2rad(1.2)
     
     i_mesh, pa_mesh = np.meshgrid(incerz, posizers, indexing='ij')
 
@@ -158,13 +154,15 @@ def main_5(data, x_norm,y_norm):
             if len(rv_array) == 0:
                 continue
             #print(rv_array)
-            new_array = trimming(rv_array)
+            #rv_array[:,1] = rv_array[:,1] + rv_array[:,2]
+            new_array = trimmerz(trimming(rv_array), 250, np.inf)
             if len(new_array) == 0:
                 continue
 
             try:
                 best_params, covariance = curve_fit(power_law, new_array[:,0], new_array[:,1],
-                                                    sigma = new_array[:,2], maxfev=5000)
+                                                    sigma = new_array[:,2], maxfev=5000,
+                                                    absolute_sigma=True)
                 
                 A_4, n_4 = best_params
                 n_perr = np.sqrt(np.diag(covariance))[1]
@@ -176,8 +174,9 @@ def main_5(data, x_norm,y_norm):
     
     A_closest, closest_n, inclination, position_angle, n_uncert = find_closest_n(results_array)
     inca = np.rad2deg(inclination)
-    posa = np.rad2deg(position_angle)
-    print(f"Closest n: {closest_n} +/- {n_uncert}, Inclination: {inca}, Position Angle: {posa}\n")
+    #posa = 157
+    posas = np.rad2deg(position_angle)
+    print(f"Closest n: {closest_n} +/- {n_uncert}, Inclination: {inca}, Position Angle: {posas}\n")
     
     incatrons = np.deg2rad(34)
     
@@ -197,18 +196,24 @@ def main_5(data, x_norm,y_norm):
     param, cov = fitting_data(power_law, result, 0)
     params_k, covariance_k = fitting_data(keplarian_fit,result, 0)
     
-    result_2 = trimmerz(result)
+    result_2 = trimmerz(result, 250, np.inf)
     result_2 = result_2[result_2[:, 0].argsort()]
     
     param_2, cov_2 = fitting_data(power_law, result_2, 0)
     params_k_2, covariance_k_2 = fitting_data(keplarian_fit,result_2, 0)
     
-    plotting(result, param, cov, params_k, covariance_k, posa, np.rad2deg(incatrons), param_2, cov_2,params_k_2, covariance_k_2)
+    result_3 = trimmerz(result, 250, np.inf)
+    result_3[:,1] = result_3[:,1] + result_3[:,3]
+    result_3 = result_3[result_3[:, 0].argsort()]
+    param_3, cov_3 = fitting_data(power_law, result_3, 0)
+    params_k_3, covariance_k_3 = fitting_data(keplarian_fit,result_3, 0)
+    
+    plotting(result, param, cov, params_k, covariance_k, posas, np.rad2deg(incatrons), param_2, cov_2, params_k_2, covariance_k_2, param_3, cov_3, params_k_3, covariance_k_3)
     
     n_PA(results_array)
     return
 
-def plotting(array,param,cov,params_k,covariance_k,phi,inc, param_2, cov_2,params_k_2, covariance_k_2):
+def plotting(array,param,cov,params_k,covariance_k,phi,inc, param_2, cov_2, params_k_2, covariance_k_2, param_3, cov_3, params_k_3, covariance_k_3):
     
     phi = '{:.0f}'.format(float(phi))
     inc = '{:.0f}'.format(float(inc))
@@ -219,8 +224,8 @@ def plotting(array,param,cov,params_k,covariance_k,phi,inc, param_2, cov_2,param
     #a = params_k[0]
     a_scaled = params_k[0] * 10**3 * au**0.5
     a_err_scaled = np.sqrt(np.diag(covariance_k))[0] * 10**3 * au**0.5
-    mass = '{:.3f}'.format(a_scaled**2 / (G*M_o))
-    mass_err = '{:.3f}'.format((2*a_scaled*a_err_scaled/G) / (M_o))
+    mass = '{:.2f}'.format(a_scaled**2 / (G*M_o))
+    mass_err = '{:.2f}'.format((2*a_scaled*a_err_scaled/G) / (M_o))
     
     plt.figure(figsize=(10, 6))
     
@@ -236,34 +241,55 @@ def plotting(array,param,cov,params_k,covariance_k,phi,inc, param_2, cov_2,param
     #a = params_k[0]
     a_scaled_2 = params_k_2[0] * 10**3 * au**0.5
     a_err_scaled_2 = np.sqrt(np.diag(covariance_k_2))[0] * 10**3 * au**0.5
-    mass_2 = '{:.3f}'.format(a_scaled_2**2 / (G*M_o))
-    mass_err_2 = '{:.3f}'.format((2*a_scaled_2*a_err_scaled_2/G) / (M_o))
+    mass_2 = '{:.2f}'.format(a_scaled_2**2 / (G*M_o))
+    mass_err_2 = '{:.2f}'.format((2*a_scaled_2*a_err_scaled_2/G) / (M_o))
 
-    fitted_data_2 = power_law(array[:,0], param_2[0], param_2[1])
-    fitted_data_2 = np.hstack((np.vstack((array[:,0])), np.vstack((fitted_data_2))))
+    fitted_data_2 = power_law(trimmerz(array, 200, np.inf)[:,0], param_2[0], param_2[1])
+    fitted_data_2 = np.hstack((np.vstack((trimmerz(array, 200, np.inf)[:,0])), np.vstack((fitted_data_2))))
     
-    keplarian_2 = keplarian_fit(array[:,0], params_k_2[0])
-    keplarian_2 = np.hstack((np.vstack((array[:,0])), np.vstack((keplarian_2))))
+    keplarian_2 = keplarian_fit(trimmerz(array, 200, np.inf)[:,0], params_k_2[0])
+    keplarian_2 = np.hstack((np.vstack((trimmerz(array, 200, np.inf)[:,0])), np.vstack((keplarian_2))))
+    
+    n_3 = param_3[1]
+    n_err_3 = np.sqrt(np.diag(cov_3))[1]
+    a_scaled_3 = params_k_3[0] * 10**3 * au**0.5
+    a_err_scaled_3 = np.sqrt(np.diag(covariance_k_3))[0] * 10**3 * au**0.5
+    mass_3 = '{:.1f}'.format(a_scaled_3**2 / (G*M_o))
+    mass_err_3 = '{:.3f}'.format((2*a_scaled_3*a_err_scaled_3/G) / (M_o))
+    m_low = float(mass_2) - float(mass_err_2)
+    #m_low_f = '{:.3f}'.format(m_low)
+
+    fitted_data_3= power_law(trimmerz(array, 200, np.inf)[:,0], param_3[0], param_3[1])
+    fitted_data_3 = np.hstack((np.vstack((trimmerz(array, 200, np.inf)[:,0])), np.vstack((fitted_data_3))))
+    
+    keplarian_3 = keplarian_fit(trimmerz(array, 200, np.inf)[:,0], params_k_3[0])
+    keplarian_3 = np.hstack((np.vstack((trimmerz(array, 200, np.inf)[:,0])), np.vstack((keplarian_3))))
     
     plt.title('Model Velocity-Distance')
     plt.ylabel('Velocity, km/s')
     plt.xlabel('Distance, AU')
 
     plt.errorbar(array[:,0], array[:,1], yerr = array[:,3]*0, xerr = array[:,2]*0, fmt='x',
-                markersize=6, alpha=0.5)
+                markersize=6, alpha=0.5, elinewidth=1.5)
     
+    plt.plot([],[],label =f'i = {inc}'+'$^{o}$,'+f' $\phi$ = {phi}'+'$^{o}$', alpha=0)
     plt.plot(fitted_data[:,0], fitted_data[:,1], label ='n = ' + 
-            str('{:.3f}'.format(n)) +'$\pm$' +str('{:.2f}'.format(n_err))+ f'\ni = {inc}\n$\phi$ = {phi}')
+            str('{:.2f}'.format(n)) +'$\pm$' +str('{:.2f}'.format(n_err)))
     
-    plt.plot(keplarian[:,0], keplarian[:,1], label = 'Keplarian fit\nM = ' +
-             str(mass) + ' $\pm$ '+str(mass_err) + '$M_{\odot}$')
+    plt.plot(keplarian[:,0], keplarian[:,1], label = 'Keplarian fit:\nM = ' +
+             str(mass) + ' $\pm$ '+str(mass_err) + ' $M_{\odot}$', alpha=0)
     plt.plot([],[],alpha=0, label=' ')
     plt.plot(fitted_data_2[:,0], fitted_data_2[:,1], label ='> 250AU:\nn = ' + 
-            str('{:.3f}'.format(n_2)) +'$\pm$' +str('{:.2f}'.format(n_err_2)))
+            str('{:.2f}'.format(n_2)) +'$\pm$' +str('{:.2f}'.format(n_err_2)))
     
-    plt.plot(keplarian_2[:,0], keplarian_2[:,1], label = 'Keplarian fit\nM = ' +
-             str(mass_2) + ' $\pm$ '+str(mass_err_2)+ '$M_{\odot}$')
+    plt.plot(keplarian_2[:,0], keplarian_2[:,1], label = 'Keplarian fit:\nM = ' +
+             str(mass_2) + ' $\pm$ '+str(mass_err_2)+ ' $M_{\odot}$', alpha=0)
+    #plt.plot(fitted_data_3[:,0], fitted_data_3[:,1], label ='n = ' + 
+    #       str('{:.3f}'.format(n_3)) +'$\pm$' +str('{:.2f}'.format(n_err_3)))
     
+    #plt.plot(keplarian_3[:,0], keplarian_3[:,1], label = 'Keplarian fit\nM = ' +
+    #         str(mass_3) + ' $\pm$ '+str(mass_err_3)+ ' $M_{\odot}$')
+    plt.plot([],[], label = str('{:.1f}'.format(m_low))+ '$M_{\odot}$ < M < '+str(mass_3) + '$M_{\odot}$', alpha=0)
     plt.legend(loc = 'upper right',borderaxespad=0.5, frameon=True)
     plt.grid(True)
     plt.show()
@@ -303,8 +329,8 @@ def x_y_uncertainty(x, y, phi, phi_err):
     yp = -x*np.sin(phi) + y*np.cos(phi)
     r = np.sqrt(xp**2 + yp**2)
     
-    xp_err = np.sqrt( (((x*np.sin(phi)) + (y*np.cos(phi)))*phi_err)**2 )
-    yp_err = np.sqrt( (((x*np.cos(phi)) + (y*np.sin(phi)))*phi_err)**2 )
+    xp_err = np.sqrt( (((x*np.sin(phi)) + (y*np.cos(phi)))*phi_err)**2 ) 
+    yp_err = np.sqrt( (((x*np.cos(phi)) + (y*np.sin(phi)))*phi_err)**2 ) 
     
     xp_flat = xp.flatten()
     yp_flat = yp.flatten()
@@ -319,21 +345,23 @@ def x_y_uncertainty(x, y, phi, phi_err):
     theta = filter_theta(theta, allowed_ranges)
     
     r = np.sqrt(xp_mesh**2 + yp_mesh**2)
-    r_err = np.sqrt( (2*xp_mesh/r * xp_err_mesh)**2 + (2*yp_mesh/r * yp_err_mesh)**2)
+    r_err = np.sqrt( (2*xp_mesh/r * xp_err_mesh)**2 + (2*yp_mesh/r * yp_err_mesh)**2) 
     
-    theta_err = np.sqrt( (yp_mesh/r * xp_err)**2 + (xp_mesh/r * yp_err_mesh)**2)
+    theta_err = np.sqrt( (yp_mesh/r * xp_err)**2 + (xp_mesh/r * yp_err_mesh)**2) 
     
     return r_err, r, theta_err, theta
 
 def velocity_uncertainty(v_obs, v_rad,i, theta, theta_err, i_err):
     
     #v_err = np.sqrt( ((0.236/v_rad)*v_obs)**2 + 0.236**2 )
-    v_err = np.sqrt( ((0.0707770409/v_rad)*v_obs)**2 + 0.0707770409**2 )
     v = (v_obs - v_rad)/(np.sin(i)*np.cos(theta))
-    
-    v_r_err = np.sqrt( (1/(np.sin(i)**2)*((v_err**2 + (v*np.cos(i)*i_err)**2)))) #+ ((v*np.tan(theta)*theta_err)/(np.cos(theta)))**2)) 
+    v_err = np.sqrt( ((0.0707770409/v_rad)*v_obs)**2 + 0.0707770409**2 ) 
+    #v = (v_obs - v_rad)/(np.sin(i)*np.cos(theta))
     
     v_r = np.abs(v_obs / (np.sin(i) * np.cos(theta)))
+    v_r_err = np.sqrt( (1/(np.sin(i)**2)*(((v_err**2 + (v*np.cos(i)*i_err)**2)) ))) #+ ((v*np.tan(theta)*theta_err)/(np.cos(theta)))**2))) 
+    
+    #v_r = np.abs(v_obs / (np.sin(i) * np.cos(theta)))
     
     return v_r_err, v_r
 
@@ -419,7 +447,7 @@ def no_nan(data):
     
     temperz = []
     for lineo in temp:
-        if lineo[1] < (mean + 6*std):
+        if lineo[1] < (mean + 10*std):
             temperz.append(lineo)
             
     return np.vstack((temperz))
@@ -463,10 +491,12 @@ def find_closest_n(results_array, target_n=-0.5):
 
     return closest_result
 
-def trimmerz(array):
+def trimmerz(array, trim_1, trim_2):
+    #trim_1 lower bound
+    #trim_2 upper bound
     temp = []
     for line in array:
-        if not line[0] < 250:
+        if not (line[0] < trim_1) | (line[0] > trim_2):
             temp.append(line)
     
     if not len(temp) ==0:
