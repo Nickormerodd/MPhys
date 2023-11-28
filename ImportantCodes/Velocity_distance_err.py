@@ -127,7 +127,7 @@ def main_4(result, phi, inc):
 def main_5(data, x_norm,y_norm):
     
     incerz = np.linspace(np.deg2rad(32), np.deg2rad(35), 5)
-    posizers = np.linspace(np.deg2rad(120), np.deg2rad(200), 100)
+    posizers = np.linspace(np.deg2rad(120), np.deg2rad(200), 400)
     phi_err = np.deg2rad(1.2)
     i_err = np.deg2rad(1.2)
     
@@ -210,7 +210,7 @@ def main_5(data, x_norm,y_norm):
     
     plotting(result, param, cov, params_k, covariance_k, posas, np.rad2deg(incatrons), param_2, cov_2, params_k_2, covariance_k_2, param_3, cov_3, params_k_3, covariance_k_3)
     
-    n_PA(results_array)
+    n_PA(results_array, position_angle)
     return
 
 def plotting(array,param,cov,params_k,covariance_k,phi,inc, param_2, cov_2, params_k_2, covariance_k_2, param_3, cov_3, params_k_3, covariance_k_3):
@@ -265,7 +265,7 @@ def plotting(array,param,cov,params_k,covariance_k,phi,inc, param_2, cov_2, para
     keplarian_3 = keplarian_fit(trimmerz(array, 200, np.inf)[:,0], params_k_3[0])
     keplarian_3 = np.hstack((np.vstack((trimmerz(array, 200, np.inf)[:,0])), np.vstack((keplarian_3))))
     
-    plt.title('Model Velocity-Distance')
+    plt.title('CH$_{3}$CN: K=7 Velocity-Distance Curve')
     plt.ylabel('Velocity, km/s')
     plt.xlabel('Distance, AU')
 
@@ -273,29 +273,33 @@ def plotting(array,param,cov,params_k,covariance_k,phi,inc, param_2, cov_2, para
                 markersize=6, alpha=0.5, elinewidth=1.5)
     
     plt.plot([],[],label =f'i = {inc}'+'$^{o}$,'+f' $\phi$ = {phi}'+'$^{o}$', alpha=0)
+    """
     plt.plot(fitted_data[:,0], fitted_data[:,1], label ='n = ' + 
             str('{:.2f}'.format(n)) +'$\pm$' +str('{:.2f}'.format(n_err)))
     
     plt.plot(keplarian[:,0], keplarian[:,1], label = 'Keplarian fit:\nM = ' +
              str(mass) + ' $\pm$ '+str(mass_err) + ' $M_{\odot}$', alpha=0)
-    plt.plot([],[],alpha=0, label=' ')
-    plt.plot(fitted_data_2[:,0], fitted_data_2[:,1], label ='> 250AU:\nn = ' + 
-            str('{:.2f}'.format(n_2)) +'$\pm$' +str('{:.2f}'.format(n_err_2)))
+    """
+    #plt.plot([],[],alpha=0, label=' ')
+    plt.plot(fitted_data_2[:,0], fitted_data_2[:,1], label ='n = ' + 
+            str('{:.2f}'.format(n_2)) +' $\pm$ ' +str('{:.2f}'.format(n_err_2)))
     
-    plt.plot(keplarian_2[:,0], keplarian_2[:,1], label = 'Keplarian fit:\nM = ' +
-             str(mass_2) + ' $\pm$ '+str(mass_err_2)+ ' $M_{\odot}$', alpha=0)
+    plt.plot(keplarian_2[:,0], keplarian_2[:,1], '--', label = 'Keplarian fit:' )#+
+           #  str(mass_2) + ' $\pm$ '+str(mass_err_2)+ ' $M_{\odot}$', alpha=0)
     #plt.plot(fitted_data_3[:,0], fitted_data_3[:,1], label ='n = ' + 
     #       str('{:.3f}'.format(n_3)) +'$\pm$' +str('{:.2f}'.format(n_err_3)))
     
     #plt.plot(keplarian_3[:,0], keplarian_3[:,1], label = 'Keplarian fit\nM = ' +
     #         str(mass_3) + ' $\pm$ '+str(mass_err_3)+ ' $M_{\odot}$')
     plt.plot([],[], label = str('{:.1f}'.format(m_low))+ '$M_{\odot}$ < M < '+str(mass_3) + '$M_{\odot}$', alpha=0)
-    plt.legend(loc = 'upper right',borderaxespad=0.5, frameon=True)
+    plt.legend(loc = 'upper right',borderaxespad=0.5, frameon=True, fontsize=12)
     plt.grid(True)
+    plt.savefig('Velocity-Distance_curve_K=7.png',bbox_inches='tight',dpi=500)
     plt.show()
+    #plt.savefig('Velocity-Distance_curve_K=7.png',bbox_inches='tight',dpi=500)
     return
 
-def n_PA(results_array):
+def n_PA(results_array, position_angle):
     
     results_array = np.array([results_array])
     
@@ -308,16 +312,27 @@ def n_PA(results_array):
     n_values = flattened_results[:, 1]
     
     PA_values = np.rad2deg(flattened_results[:, 3])
-    
+    #min_x_index = np.argmin(flattened_results[:, 0])
+
+    # Extract the corresponding y-value
+    #min_PA = flattened_results[min_x_index, 3]
+    min_epic = np.rad2deg(position_angle)
+    y_vals = np.linspace(-0.6,max(flattened_results[:, 1]),2)
+    x_vals = np.linspace(min_epic,min_epic,2)
+   # minerz_pa = flattened_results[min]
     # Create the plot
     plt.figure(figsize=(10, 6))
     plt.scatter(PA_values, n_values, color='blue')
+    plt.plot(x_vals,y_vals,'--',color='red', alpha=0.5, label='$\phi$ = '+str(round(min_epic)))
     #plt.plot(PA_values, n_values)
-    plt.title('n vs. PA, k=7')
+    plt.title('Power Law vs. Position Angle, K=7')
     plt.xlabel('Position Angle (PA)')
     plt.ylabel('Power Law Exponent (n)')
     plt.grid(True)
+    plt.legend(loc = 'upper right',borderaxespad=0.5, frameon=True, fontsize=12)
+    plt.savefig('Power_law_vs_PA_k=7.png', bbox_inches='tight',dpi=500)
     plt.show()
+    #plt.savefig('Power_law_vs_PA_k=7.png', bbox_inches='tight',dpi=500)
 
 def x_y_uncertainty(x, y, phi, phi_err):
     """
@@ -506,3 +521,4 @@ def trimmerz(array, trim_1, trim_2):
     return temp
 
 get_data()
+
