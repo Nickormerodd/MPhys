@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Created on Fri Oct  6 19:07:00 2023
 
@@ -176,7 +177,7 @@ def line_graph(data, gaus, params, name, covariance):
     
     ax.errorbar(data[:,2], data[:,1], yerr=0.154, linewidth = 1, 
                 label='Data', fmt='x')
-    ax.set_title(name)
+    ax.set_title('CH$_{3}$CN: ' + name)
     ax.set_xlabel('Frequency, GHz')
     ax.set_ylabel('Brightness temperature, K')
     ax.tick_params(axis='x', labelsize=9)
@@ -246,7 +247,7 @@ def line_graph(data, gaus, params, name, covariance):
     
     name = ((name.replace('$','')).replace(' ','')).replace("\\rightarrow","")
     
-    #plt.savefig('Gaussian_CH3CN_'+str(name) + '.png', dpi=1000, bbox_inches='tight')
+    plt.savefig('Gaussian_CH3CN_'+str(name) + '.png', dpi=1000, bbox_inches='tight')
     
     return f_rest
 
