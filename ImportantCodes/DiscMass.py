@@ -7,14 +7,14 @@ Created on Sun Dec  3 12:12:06 2023
 
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.optimize import curve_fit
+#from scipy.optimize import curve_fit
 from tkinter import Tk, filedialog
 from astropy.io import fits
-from astropy.modeling import models, fitting
-from mpl_toolkits.mplot3d import Axes3D
-from astropy.wcs import WCS
+#from astropy.modeling import models, fitting
+#from mpl_toolkits.mplot3d import Axes3D
+#from astropy.wcs import WCS
 from astropy import units as u
-from radio_beam import Beam
+#from radio_beam import Beam
 
 ############################## global params ##################################
 pc = 3.086e+16
@@ -24,9 +24,11 @@ au = 1.496e+11
 distance = 8.1*10**3  # Example distance in parsecs
 kappa_nu = 1.99  # Dust opacity in cm^2/g
 lambda_mm = 1.3  # Wavelength in millimeters
-temperature_K = 20  # Temperature in Kelvin
-SaveFig = False
-SaveFigName = 'C:/Users/nickl/linux/data/MassSubtraction.png'
+temperature_K = 50  # Temperature in Kelvin
+doi = 1 #times the FWHM beams by this much
+SaveFig = True
+SaveFigName = 'C:/Users/nickl/linux/week10/massbefore.png'
+SaveFigName2 = 'C:/Users/nickl/linux/week10/MassSubtraction.png'
 initial_dir = 'C:/Users/nickl/linux/data/Fits_Jansky' #where is your rings_final2.txt file
 #############################################################################
 
@@ -96,8 +98,8 @@ def Jy_image_and_plot(data, header, z):
     pixel_scale_lat = abs(header['CDELT2'])
     beam_major_pixels = header['BMAJ'] / pixel_scale_lon
     beam_minor_pixels = header['BMIN'] / pixel_scale_lat
-    fwhm_stddev_maj_y = 1*beam_major_pixels / (2 * np.sqrt(2 * np.log(2)))
-    fwhm_stddev_min_x = 1*beam_minor_pixels / (2 * np.sqrt(2 * np.log(2)))
+    fwhm_stddev_maj_y = doi*beam_major_pixels / (2 * np.sqrt(2 * np.log(2)))
+    fwhm_stddev_min_x = doi*beam_minor_pixels / (2 * np.sqrt(2 * np.log(2)))
     print(f'BMAJ = {fwhm_stddev_maj_y:.3f}, BMIN = {fwhm_stddev_min_x:.3f}')
 
     flux_density = data
@@ -117,6 +119,10 @@ def Jy_image_and_plot(data, header, z):
     ax.set_xlabel('X Axis')
     ax.set_ylabel('Y Axis')
     ax.set_zlabel('Flux in Jy')  # Optional: Add a label for the z axis
+    if SaveFig:
+        plt.savefig(fname=SaveFigName, bbox_inches='tight', dpi=400)
+
+    plt.show()
     plt.show()
 
     z[np.isnan(z)] = 0.0
@@ -158,11 +164,11 @@ def Jy_image_and_plot(data, header, z):
     ax1.set_title('Subtracted Brightness')
 
     if SaveFig:
-        plt.savefig(fname=SaveFigName, bbox_inches='tight', dpi=400)
+        plt.savefig(fname=SaveFigName2, bbox_inches='tight', dpi=400)
 
     plt.show()
 
-    return Jy_image
+    return
 
 def galactic_coords(data, header):
 
@@ -196,6 +202,7 @@ def mass_calc(Jy_image):
 def main():
     data, header = get_data(initial_dir)
     z = flux_calc(data, header)
-    Jy_data = Jy_image_and_plot(data, header, z)
+    Jy_image_and_plot(data, header, z)
 
 main()
+
