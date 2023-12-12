@@ -24,9 +24,10 @@ au = 1.496e+11
 distance = 8.1*10**3  # Example distance in parsecs
 kappa_nu = 1.99  # Dust opacity in cm^2/g
 lambda_mm = 1.3  # Wavelength in millimeters
-temperature_K = 50  # Temperature in Kelvin
+temperature_dust = 22  # Temperature dust estimate
+temperature_x = 234  # Temperature in Kelvin
 doi = 1 #times the FWHM beams by this much
-SaveFig = True
+SaveFig = False
 SaveFigName = 'C:/Users/nickl/linux/week10/massbefore.png'
 SaveFigName2 = 'C:/Users/nickl/linux/week10/MassSubtraction.png'
 initial_dir = 'C:/Users/nickl/linux/data/Fits_Jansky' #where is your rings_final2.txt file
@@ -74,15 +75,18 @@ def flux_calc(data, header):
     y_norm = y_m - yo_m #normalising around the yo point
     """
     M = np.zeros((m, p))
+    D = np.zeros((m, p))
     z = np.zeros((m, p))
     for i in range(m): # i is y
         for j in range(p): #  j is x
-            M[i, j] = mass_calc(F_v[0, i, j]*u.Jy) #takes 'mass' at each point
+            M[i, j] = mass_calc(F_v[0, i, j]*u.Jy, temperature_x) #takes 'mass' at each point
+            D[i, j] = mass_calc(F_v[0, i, j]*u.Jy, temperature_dust)
             z[i,j] = F_v[0,i,j] #takes Jy at each point
 
     print(f'{np.nansum(z):.3f} sum of Flux in Jy')
-    print(f'{np.nanmax(M):.3f} max sol mass in one pixel')
-    print(f'{np.nansum(M):.3f} sum sol mass')
+    print(f'{np.nanmax(D):.3f} max sol mass in one pixel (T = {temperature_dust})')
+    print(f'{np.nansum(D):.3f} sum sol mass with T = {temperature_dust}')
+    print(f'{np.nansum(M):.3f} sum sol mass with T = {temperature_x}')
     #print(np.nanmax(surf_density))
     #print(np.nanmin(surf_density))
 
@@ -100,7 +104,7 @@ def Jy_image_and_plot(data, header, z):
     beam_minor_pixels = header['BMIN'] / pixel_scale_lat
     fwhm_stddev_maj_y = doi*beam_major_pixels / (2 * np.sqrt(2 * np.log(2)))
     fwhm_stddev_min_x = doi*beam_minor_pixels / (2 * np.sqrt(2 * np.log(2)))
-    print(f'BMAJ = {fwhm_stddev_maj_y:.3f}, BMIN = {fwhm_stddev_min_x:.3f}')
+    #print(f'BMAJ = {fwhm_stddev_maj_y:.3f}, BMIN = {fwhm_stddev_min_x:.3f}')
 
     flux_density = data
     flux_density_Jy = (data * u.Jy / u.beam).to(u.Jy / u.sr, equivalencies=u.beam_angular_area(beam_area_sr * u.sr)) # Convert flux from Jy/beam to Jy/sr
@@ -138,14 +142,15 @@ def Jy_image_and_plot(data, header, z):
     z_subtracted = image_data_subtracted * beam_area_sr *u.sr/(u.Jy) #now in Jy
     z_subtracted_2d = z_subtracted.reshape(x.shape)
     print(f'{np.nansum(z_subtracted):.3f} sum of Flux in Jy after subtraction')
-    Mass_after_sub = mass_calc(z_subtracted*u.Jy)
-    print(f'{np.nansum(Mass_after_sub):.3f} sum of sol mass after subtraction')
-
+    Mass_after_sub = mass_calc(z_subtracted*u.Jy, temperature_dust)
+    MAS_x = mass_calc(z_subtracted*u.Jy, temperature_x)
+    print(f'{np.nansum(Mass_after_sub):.3f} sum of sol mass after subtraction for T = {temperature_dust}')
+    print(f'{np.nansum(MAS_x):.3f} sum of sol mass after subtraction for T = {temperature_x}')
     #the difference between doing only above zero (3.5 sol mass instead of 7.3)
-    z_no0 = z_subtracted[z_subtracted > 0]
-    print(f'{np.nansum(z_no0):.3f} sum of Flux22 in Jy after subtraction')
-    Mass_after_sub2 = mass_calc(z_no0*u.Jy)
-    print(f'{np.nansum(Mass_after_sub2):.3f} sum of sol mass22 after subtraction')
+    #z_no0 = z_subtracted[z_subtracted > 0]
+    #print(f'{np.nansum(z_no0):.3f} sum of Flux22 in Jy after subtraction')
+    #Mass_after_sub2 = mass_calc(z_no0*u.Jy, temperature_dust)
+    #print(f'{np.nansum(Mass_after_sub2):.3f} sum of sol mass22 after subtraction')
     mask = z_subtracted_2d > 0
     z_no0_2d = np.where(mask, z_subtracted_2d, 0)
 
@@ -194,8 +199,8 @@ def galactic_coords(data, header):
 
     return x_m,y_m, x_gal, y_gal
 
-def mass_calc(Jy_image):
-    mass_sol = 0.12 * (np.exp(1.439 * (lambda_mm)**(-1)*(temperature_K/10)**(-1)) - 1) * (Jy_image/(1*u.Jy)) *(kappa_nu/ 0.01)**(-1) * (distance/ 100)**2 * (lambda_mm)**3
+def mass_calc(Jy_image, temperature):
+    mass_sol = 0.12 * (np.exp(1.439 * (lambda_mm)**(-1)*(temperature/10)**(-1)) - 1) * (Jy_image/(1*u.Jy)) *(kappa_nu/ 0.01)**(-1) * (distance/ 100)**2 * (lambda_mm)**3
     return mass_sol
 
 
