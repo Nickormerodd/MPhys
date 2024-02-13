@@ -6,8 +6,8 @@ This semester we will attempt to recreate the previous semesters findings but wi
 
 1) Jy to beam python
 2) fits files python
-3) calibrating python
-4) momentm mapping python
+3) calibrating CH3CN python
+4) automating casa immoments python
 
 ############ CASA FUNCTIONS ################
 
