@@ -44,7 +44,7 @@ def change_header_info(hdul, output_fits_file, path, name):
     
     print(name)
     header = hdul[0].header
-    print(header)
+    #print(header)
     if 'k=0' in name.lower():
         transition_freq = 220.747369
         obs_freq = calculations(hdul)
