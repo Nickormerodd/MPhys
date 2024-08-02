@@ -1,8 +1,24 @@
 # -*- coding: utf-8 -*-
 """
 Created on Tue Nov 21 12:52:59 2023
+Edited June 2024
 
-@author: Christopher
+@author: Christopher Andrews
+
+Using a velocity map, this code creates a rotational velocity vs distance
+figure and calculates the exponent and mass, with respective uncertainties.
+
+It also calculates a ring-averaged velocity distance. The uncertainties
+on each point here are calculated using MAD, which may be an overestimate. 
+The code treats this calculated 'uncertainty' on the velocity like a true
+uncertainty, but it is really just the distribution of points due to scatter
+around the ring. 
+
+The coordinate transformation implementation should be reconsidered,
+maybe using an astropy package etc. 
+
+User-defined inputs are at the top.
+
 """
 
 import numpy as np
@@ -12,16 +28,42 @@ from tkinter import filedialog
 import os
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
-#from mpl_toolkits.mplot3d import Axes3D as mpl
-from matplotlib.lines import Line2D
-from scipy.constants import c
-#import uncertainties.unumpy as unp
-#from uncertainties import ufloat
+import copy
+from statsmodels import robust
 
 G = 6.6743e-11
 au = 1.495979e+11
 M_o = 1.98847e+30
 OUT = 'C:/Users/Christopher/onedrive/documents/4th_year_physics/mphys_project/S2/W4-6/Velocity_curve/'
+
+##############################################################################
+#User defined inputs
+
+XO_PIX,YO_PIX = 17,17 # Define central pixel to normalise around
+
+# Radial component to trim the data set to.
+TRIM = 1750 # AU
+LOWER_TRIM = 250 # AU - allows for better fits 
+
+# Show the rotational figure:
+SHOW_ROT_FIG = True
+
+# Show the exponent vs position angle figure:
+SHOW_N_PA = True
+
+# Position angle + inclination angle + uncertainties in degrees
+POSITION_ANGLE = 170 
+INCLINATION = 38
+PHI_ERR = 3 # position angle uncertainty
+INC_ERR = 1.5 # inclination angle uncertainty
+
+# Radial velocity of source + uncertainty
+RADIAL_VELOCITY = 28.9 #km/s
+V_RAD_ERR = 0.0707770409 #km/s
+
+
+
+##############################################################################
 
 def get_data():
 
@@ -37,22 +79,18 @@ def get_data():
 
 def main(data,name,file_path):
 
-    xo_pix,yo_pix = 48,49
-    xo_pix,yo_pix = 26,33
-    xo_pix,yo_pix = 17,22
-    xo_pix,yo_pix = 17,17
-    #xo_pix,yo_pix = 24,23
+    xo_pix,yo_pix = XO_PIX,YO_PIX
+
     header = data[0].header
     
+    # Masking velocities near zero to remove non-real zero rotational velocites
+    # which skew the fittings.
     valid_indices = (data[0].data < (np.nanmean(data[0].data - 0.2))) | (data[0].data > (np.nanmean(data[0].data + 0.2)))
     data[0].data[~valid_indices] = np.nan
-    #print(np.nanmean(data[0].data))     
-    print(data[0].shape)
-                            
+
     data[0].data = data[0].data - np.nanmean(data[0].data)
 
     amended_data = match_shapes_with_nan(data[0].data)[0]  # This selects the 2D slice.
-    #v_obs_flattened = amended_data.flatten()  # Flatten the 2D array to a 1D array
 
     x_au, y_au = galactic_coords(amended_data, header)
     
@@ -61,101 +99,25 @@ def main(data,name,file_path):
     
     x_norm = x_au - xo_au #normalising around the xo point
     y_norm = y_au - yo_au #normalising around the yo point
-    """
-    for i in range(inc.shape[0]):
-        x_trans, y_trans = coordinate_transform(x_norm, y_norm, Pos_ang[i])
-        #x_trans_8, y_trans_8 = coordinate_transform(x_norm, y_norm, PA_8)
 
-        rv_array = rotational_velocity(amended_data, x_trans, y_trans, inc[i])
-        #rv_array_8 = rotational_velocity(amended_data, x_trans_8, y_trans_8, i_8)
-    
-        main_2(rv_array, name, inc[i], Pos_ang[i])
-    """
-    #main_3(amended_data, x_norm, y_norm, name)
     main_5(amended_data, x_norm, y_norm, name)
-    """
-    ##################################### add values here
-    position_angle = np.deg2rad(170)
-    incatrons = np.deg2rad(38)
-    x_trans,y_trans = coord_trans(x_norm, y_norm, position_angle)
-    print(x_trans)
-    v_rot_matrix, combined= rotational_velocity(amended_data, x_trans, y_trans, np.deg2rad(38), 1)
-    # combined is r and v_rot
-    print(combined)
-    combined = combined[combined[:, 0].argsort()]
-    #new_plotting(combined)
-    
-    """
-    ######################################
-    return
 
-def main_3(amended_data, x_norm, y_norm, name):
-    
-    phi = np.deg2rad(156.06060606060606)
-    phi_err = np.deg2rad(1)
-    i = np.deg2rad(34)
-    i_err = np.deg2rad(2)
-    
-    
-    r_err, r, theta_err, theta = x_y_uncertainty(x_norm, y_norm, phi, phi_err)
-    v_r_err, v_r = velocity_uncertainty(amended_data, 28.673155,i, theta, theta_err, i_err)
-    
-    r_flat = r.flatten()
-    v_r_flat = v_r.flatten()
-    r_err_flat = r_err.flatten()
-    v_r_err_flat = v_r_err.flatten()
-    
-    
-    result = np.vstack((r_flat,v_r_flat,r_err_flat,v_r_err_flat)).T
-    result = no_nan(result)
-    result = trimming(result)
-    #result = result[result[:, 0].argsort()]
-    #main_4(result,phi,i)
-    #print(result)
-    return
-
-def main_4(result, phi, inc):
-    
-    param, cov = fitting_data(power_law, result, 0)
-    params_k, covariance_k = fitting_data(keplarian_fit,result, 0)
-    
-    n = param[1]
-    n_err = np.sqrt(np.diag(cov))[1]
-    
-    #a = params_k[0]
-    a_scaled = params_k[0] * 10**3 * au**0.5
-    a_err_scaled = np.sqrt(np.diag(covariance_k))[0] * 10**3 * au**0.5
-    mass = '{:.3f}'.format(a_scaled**2 / (G*M_o))
-    mass_err = '{:.3f}'.format(a_err_scaled**2 / (G*M_o))
-    
-    i_deg = '{:.1f}'.format(np.rad2deg(inc))
-    phi_deg = '{:.1f}'.format(np.rad2deg(phi))
-    
-    result_2 = trimmerz(result, 250, np.inf)
-    result_2 = result_2[result_2[:, 0].argsort()]
-    
-    param_2, cov_2 = fitting_data(power_law, result_2, 0)
-    params_k_2, covariance_k_2 = fitting_data(keplarian_fit,result_2, 0)
-    
-    #result_3 = trimmerz(result)
-    
-    plotting(result, param, cov, params_k, covariance_k, phi_deg, i_deg, 
-             param_2, cov_2,params_k_2, covariance_k_2)
-    
     return
 
 def main_5(data, x_norm,y_norm, name):
     
     incerz = np.linspace(np.deg2rad(34), np.deg2rad(34), 1)
     posizers = np.linspace(np.deg2rad(120), np.deg2rad(190), 500)
-    phi_err = np.deg2rad(1.2)
-    i_err = np.deg2rad(1.2)
+    phi_err = np.deg2rad(PHI_ERR)
+    i_err = np.deg2rad(INC_ERR)
     
     i_mesh, pa_mesh = np.meshgrid(incerz, posizers, indexing='ij')
 
     # Initialize an empty list to store the results
     results_array = np.full((len(incerz), len(posizers), 5), np.nan)
-
+    
+###############################################################################
+    # This is to make the position angle vs exponent plot - not necessarily needed
     # Iterate through the meshgrid
     for i in range(len(incerz)):
         for j in range(len(posizers)):
@@ -174,8 +136,7 @@ def main_5(data, x_norm,y_norm, name):
             rv_array = no_nan(rv_array)
             if len(rv_array) == 0:
                 continue
-            #print(rv_array)
-            #rv_array[:,1] = rv_array[:,1] + rv_array[:,2]
+            
             new_array = trimmerz(rv_array, 250, 1750)
             if len(new_array) == 0:
                 continue
@@ -193,88 +154,157 @@ def main_5(data, x_norm,y_norm, name):
     
             results_array[i, j] = [A_4, n_4, inc, phi, n_perr]
     
+    # To make the n-exponent vs position angle
     A_closest, closest_n, inclination, position_angle, n_uncert = find_closest_n(results_array)
-    inca = np.rad2deg(inclination)
-    #posa = 157
-    posas = np.deg2rad(170)
     
+##############################################################################
     
-    #print(f"Closest n: {closest_n} +/- {n_uncert}, Inclination: {inca}, Position Angle: {posas}\n")
-    
-    incatrons = np.deg2rad(38)
-    """
-    
-    ##################################### add values here
-    position_angle = np.deg2rad(170)
-    incatrons = np.deg2rad(38)
-    x_trans,y_trans = coord_trans(x_norm, y_norm, position_angle)
-    v_rot_matrix, combined= rotational_velocity(data[0].data, x_trans, y_trans, np.deg2rad(38), 1)
-    # combined is r and v_rot
-    new_plotting(combined)
-    
-    
-    ######################################
-    
-    
-    
-    """
+    posas = np.deg2rad(POSITION_ANGLE)
+    incatrons = np.deg2rad(INCLINATION)
+
+    # Calculating the all the values
     r_err, r, theta_err, theta = x_y_uncertainty(x_norm, y_norm, position_angle, phi_err)
-    v_r_err, v_r = velocity_uncertainty(data, 28.9, incatrons, theta, theta_err, i_err)
+    v_r_err, v_r = velocity_uncertainty(data, RADIAL_VELOCITY, incatrons, theta, theta_err, i_err)
     
-    #v_r = v_r[v_r>25] = np.nan
+    # To show a view of the 'rotational velocity map' to see if it looks ok
+    if SHOW_ROT_FIG:
+        fig, ax = plt.subplots()
+        cmap = plt.cm.viridis  
+        cmap.set_bad(color='black')  
+        im = ax.imshow(np.ma.masked_invalid(v_r),cmap=cmap)
+        ax.set_title('Rotational Volocity')
+        plt.colorbar(im) 
+        plt.show()
     
-    fig, ax = plt.subplots()
-    # Use np.ma.masked_invalid to hide the invalid values in the plot
-    cmap = plt.cm.viridis  # Choose a colormap that suits your data
-    cmap.set_bad(color='black')  # Set color for masked elements
-    im = ax.imshow(np.ma.masked_invalid(v_r),cmap=cmap)
-    ax.set_title('Rotational Velocity')
-    plt.colorbar(im)  # Show the color bar
-    plt.show()
-    
+    # Flatten matrices
     r_flat = r.flatten()
     v_r_flat = v_r.flatten()
     r_err_flat = r_err.flatten()
     v_r_err_flat = v_r_err.flatten()
     
+    # Combine into one matrix
     result = np.vstack((r_flat,v_r_flat,r_err_flat,v_r_err_flat)).T
-    result = no_nan(result)
-    result = trimming(result)
+    result = no_nan(result) # Remove nans
+    result = trimming(result) # Trim data such that radial data is below TRIM
     result = result[result[:, 0].argsort()]
     
-    param, cov = fitting_data(power_law, result, 0)
-    params_k, covariance_k = fitting_data(keplarian_fit,result, 0)
+    # Result_norm has no bounds applied.
+    result_norm = trimmerz(result, LOWER_TRIM, np.inf)
+    result_norm = result_norm[result_norm[:, 0].argsort()]
     
-    result_2 = trimmerz(result, 250, np.inf)
-    result_2 = result_2[result_2[:, 0].argsort()]
+    # Curve fitting for whole data
+    param, cov = fitting_data(power_law, result_norm, 0)
+    params_k, covariance_k = fitting_data(keplarian_fit,result_norm, 0)
     
-    param_2, cov_2 = fitting_data(power_law, result_2, 0)
-    params_k_2, covariance_k_2 = fitting_data(keplarian_fit,result_2, 0)
+    # Result_low is trimming 250-inf and has lower-bound velocity: v - v_err
+    result_low = trimmerz(result, LOWER_TRIM, np.inf)
+    result_low[:,1] = result_low[:,1] - result_low[:,3]
+    result_low = result_low[result_low[:, 0].argsort()]
     
-    result_3 = trimmerz(result, 250, np.inf)
-    result_3[:,1] = result_3[:,1] + result_3[:,3]
-    result_3 = result_3[result_3[:, 0].argsort()]
-    param_3, cov_3 = fitting_data(power_law, result_3, 0)
-    params_k_3, covariance_k_3 = fitting_data(keplarian_fit,result_3, 0)
+    # Curve fitting for result_low
+    param_low, cov_low = fitting_data(power_law, result_low, 0)
+    params_k_low, covariance_k_low = fitting_data(keplarian_fit,result_low, 0)
     
-    averaged_array = ring_averaging(result)
-    #averaged_array[:,1] = averaged_array[:,1] + averaged_array[:,3]
-    #new_columns = np.zeros((len(averaged_array), 2))  # Create a new array with two columns filled with zeros
-    #averaged_array = np.hstack((averaged_array, new_columns))
+    # Result_high is trimming 250-inf and has upper-bound velocity: v + v_err
+    result_high = trimmerz(result, LOWER_TRIM, np.inf)
+    result_high[:,1] = result_high[:,1] + result_high[:,3]
+    result_high = result_high[result_high[:, 0].argsort()]
     
-    param_av, cov_av = fitting_data(power_law, trimmerz(averaged_array, 10, np.inf), 0)
-    params_k_av, covariance_k_av = fitting_data(keplarian_fit,averaged_array, 0)
+    # Curve fitting for result_high
+    param_high, cov_high = fitting_data(power_law, result_high, 0)
+    params_k_high, covariance_k_high = fitting_data(keplarian_fit,result_high, 0)
     
-    m_low, m_high = plotting(result, param, cov, params_k, covariance_k, posas, np.rad2deg(incatrons), param_2, cov_2, params_k_2, covariance_k_2, param_3, cov_3, params_k_3, covariance_k_3, name, 0, 0)
-    plotting(averaged_array, param, cov, params_k, covariance_k, posas, np.rad2deg(incatrons), param_av, cov_2, params_k_av, covariance_k_2, param_av, cov_av, params_k_av, covariance_k_av, name, m_low, m_high)
+    # Ring-averaging the rotational velocity
+    averaged_array = ring_averaging_with_mad(result)
     
-    n_PA(results_array, position_angle)
+    # Copy array and modify so it is the lower bound
+    averaged_array_low = copy.deepcopy(averaged_array)
+    averaged_array_low[:,1] = averaged_array_low[:,1] - averaged_array_low[:,3]
+    
+    # Copy array and modify so it is the upper bound
+    averaged_array_high = copy.deepcopy(averaged_array)
+    averaged_array_high[:,1] = averaged_array_high[:,1] + averaged_array_high[:,3]
+    
+    # Curve fitting for the ring-averaged array, lower bound + upper bound
+    param_av, cov_av = fitting_data(power_law, trimmerz(averaged_array, LOWER_TRIM, np.inf), 0)
+    params_k_av, covariance_k_av = fitting_data(keplarian_fit,trimmerz(averaged_array, LOWER_TRIM, np.inf), 0)
+    
+    param_av_low, cov_av_low = fitting_data(power_law, trimmerz(averaged_array_low, LOWER_TRIM, np.inf), 0)
+    params_k_av_low, covariance_k_av_low = fitting_data(keplarian_fit,trimmerz(averaged_array_low, LOWER_TRIM, np.inf), 0)
+    
+    param_av_high, cov_av_high = fitting_data(power_law, trimmerz(averaged_array_high, LOWER_TRIM, np.inf), 0)
+    params_k_av_high, covariance_k_av_high = fitting_data(keplarian_fit,trimmerz(averaged_array_high, LOWER_TRIM, np.inf), 0)
+    
+    
+    # Normal plotting
+    plotting(result, param, cov, params_k, covariance_k, posas, 
+                             INCLINATION, param_low, cov_low, params_k_low, 
+                             covariance_k_low, param_high, cov_high, params_k_high, 
+                             covariance_k_high, name, 0)
+    
+    # Ring-averaging plotting
+    plotting(averaged_array, param_av, cov_av, params_k_av, covariance_k_av, 
+             posas, INCLINATION, param_av_low, cov_av_low, params_k_av_low, 
+             covariance_k_av_low, param_av_high, cov_av_high, params_k_av_high, 
+             covariance_k_av_high, name, 1)
+    
+    if SHOW_N_PA:
+        n_PA(results_array, position_angle)
     
     return
 
+def ring_averaging_with_mad(matrix, bin_size=100):
+    """
+    Errors for this are still massive, so might want to use another method as 
+    the mass-range is very large.
+    
+    Perform ring averaging using the Median Absolute Deviation (MAD) to calculate uncertainties.
+    
+    Parameters:
+    - matrix: A 2D numpy array where the first column is the radial component in AU,
+              the second column is the rotational velocity component,
+              and the third column is the radial error (which we don't use for averaging here),
+              and the fourth column is the velocity error component.
+    - bin_size: Size of each bin in AU.
 
+    Returns:
+    - A new 2D numpy array with each row representing the average radial point,
+      the average rotational velocity, a placeholder for radial error, 
+      and the MAD of the rotational velocity for each 100 AU segment.
+    """
+    if matrix.shape[1] > 4:
+        matrix = matrix[:, :4]
+
+    max_distance = np.max(matrix[:, 0])
+    bins = np.arange(0, max_distance + bin_size, bin_size)
+
+    averaged_matrix = []
+    mad_matrix = []
+
+    for i in range(1, len(bins)):
+        bin_mask = (matrix[:, 0] >= bins[i-1]) & (matrix[:, 0] < bins[i])
+        if np.any(bin_mask):
+            bin_data = matrix[bin_mask, :]
+            
+            mean_values = np.mean(bin_data, axis=0)
+            mad_values = robust.mad(bin_data[:, 1])  # MAD for the rotational velocity component
+            
+            mean_values[3] = mad_values  # Update the velocity error with MAD
+            
+            averaged_matrix.append(mean_values)
+
+    averaged_matrix_np = np.vstack(averaged_matrix) if averaged_matrix else np.empty((0, 4))
+
+    return averaged_matrix_np
+
+
+##################################################################################################
+# This isnt used, but have left it here. The velocity error is the standard deviation
 def ring_averaging(matrix):
     """
+    May want to modify this so it takes into account weighted average or 
+    remove outliers from the average etc.
+    
     Perform averaging of the radial velocity component, rotational velocity component,
     and a third data component over every 100 AU, excluding any further columns.
     Add standard deviation for each point.
@@ -324,179 +354,108 @@ def ring_averaging(matrix):
 
     return averaged_matrix_nice
 
+################################################################################################
 
 def coord_trans(x,y,phi):
-    #phi = np.deg2rad(phi)
-    inc = np.deg2rad(34)
-    alpha = np.pi - phi
+    """
+    ---------------------------------------------------------------------------
+    Have left this in, but should do this coord trans more carefully using 
+    astropy packages, and more carefully consider the coord units used etc.
+    ---------------------------------------------------------------------------
+
+    """
+    inc = np.deg2rad(INCLINATION)
+    alpha = phi # +/- np.pi
     
-    x_prime = x*np.cos(alpha) + y*np.sin(alpha)
-    y_prime = -x*np.sin(alpha)/np.cos(inc) + y*np.cos(alpha)/np.cos(inc)
-    """
-    xp = x*np.cos(phi) + y*np.sin(phi)
-    yp = -x*np.sin(phi) + y*np.cos(phi)
-    """
+    x_prime = x*np.cos(alpha) - y*np.sin(alpha)
+    y_prime = x*np.sin(alpha)/np.cos(inc) + y*np.cos(alpha)/np.cos(inc)
+
     return x_prime,y_prime
 
-def plotting(array,param,cov,params_k,covariance_k,phi,inc, param_2, cov_2, params_k_2, covariance_k_2, param_3, cov_3, params_k_3, covariance_k_3, name, m_lower, m_higher):
+def plotting(array,param,cov,params_k,covariance_k,phi,inc, param_low, cov_low,
+             params_k_low, covariance_k_low, param_high, cov_high, params_k_high, 
+             covariance_k_high, name, ring):
     
     phi = '{:.0f}'.format(float(phi))
     inc = '{:.0f}'.format(float(inc))
-    #print(array)
-    
+
     n = param[1]
     n_err = np.sqrt(np.diag(cov))[1]
     
-    if 'k=0' in name.lower():
-        k_number = 0
-
-    elif 'k=1' in name.lower():
-        k_number = 1
-
-    elif 'k=2' in name.lower():
-        k_number = 2
-
-    elif 'k=3' in name.lower():
-        k_number = 3
-
-    elif 'k=4' in name.lower():
-        k_number = 4
-
-    elif 'k=5' in name.lower():
-        k_number = 5
-
-    elif 'k=6' in name.lower():
-        k_number = 6
-
-    elif 'k=7' in name.lower():
-        k_number = 7
-
-    elif 'k=8' in name.lower():
-        k_number = 8
-
-    else:
-        title = 'unknown'
-        k_number = 'unknown'
-    
-    #a = params_k[0]
+    # Proportionality constant and mass
     a_scaled = params_k[0] * 10**3 * au**0.5
     a_err_scaled = np.sqrt(np.diag(covariance_k))[0] * 10**3 * au**0.5
     mass = '{:.2f}'.format(a_scaled**2 / (G*M_o))
     mass_err = '{:.2f}'.format((2*a_scaled*a_err_scaled/G) / (M_o))
     
     plt.figure(figsize=(10, 6))
-    
-    fitted_data = power_law(array[:,0], param[0], param[1])
-    fitted_data = np.hstack((np.vstack((array[:,0])), np.vstack((fitted_data))))
-    
-    keplarian = keplarian_fit(array[:,0], params_k[0])
-    keplarian = np.hstack((np.vstack((array[:,0])), np.vstack((keplarian))))
-    
-    n_2 = param_2[1]
-    n_err_2 = np.sqrt(np.diag(cov_2))[1]
-    
-    #a = params_k[0]
-    a_scaled_2 = params_k_2[0] * 10**3 * au**0.5
-    a_err_scaled_2 = np.sqrt(np.diag(covariance_k_2))[0] * 10**3 * au**0.5
-    mass_2 = '{:.2f}'.format(a_scaled_2**2 / (G*M_o))
-    mass_err_2 = '{:.2f}'.format((2*a_scaled_2*a_err_scaled_2/G) / (M_o))
 
-    #fitted_data_2 = power_law(trimmerz(array, 100, np.inf)[:,0], param_2[0], param_2[1])
-    fitted_data_2 = power_law(np.linspace(150,1350,40), param_2[0], param_2[1])
-    #fitted_data_2 = np.hstack((np.vstack((trimmerz(array, 100, np.inf)[:,0])), np.vstack((fitted_data_2))))
-    fitted_data_2 = np.hstack((np.vstack((np.linspace(150,1350,40))), np.vstack((fitted_data_2))))
-    
-    #keplarian_2 = keplarian_fit(trimmerz(array, 100, np.inf)[:,0], params_k_2[0])
-    keplarian_2 = keplarian_fit(np.linspace(150,1350,40), params_k_2[0])
-    #keplarian_2 = np.hstack((np.vstack((trimmerz(array, 100, np.inf)[:,0])), np.vstack((keplarian_2))))
-    keplarian_2 = np.hstack((np.vstack((np.linspace(150,1350,40))), np.vstack((keplarian_2))))
-    
-    n_3 = param_3[1]
-    n_err_3 = np.sqrt(np.diag(cov_3))[1]
-    a_scaled_3 = params_k_3[0] * 10**3 * au**0.5
-    a_err_scaled_3 = np.sqrt(np.diag(covariance_k_3))[0] * 10**3 * au**0.5
-    mass_3 = '{:.1f}'.format(a_scaled_3**2 / (G*M_o))
-    mass_err_3 = '{:.3f}'.format((2*a_scaled_3*a_err_scaled_3/G) / (M_o))
-    m_low = float(mass_2) - float(mass_err_2)
-    m_high = float(mass_3) + float(mass_err_3)
-    print(m_low,m_high)
-    #m_low_f = '{:.3f}'.format(m_low)
+    # Lower bound
+    n_low = param_low[1]
+    n_err_low = np.sqrt(np.diag(cov_low))[1]
+    a_scaled_low = params_k_low[0] * 10**3 * au**0.5
+    a_err_scaled_low = np.sqrt(np.diag(covariance_k_low))[0] * 10**3 * au**0.5
+    mass_low = '{:.2f}'.format(a_scaled_low**2 / (G*M_o))
+    mass_err_low = '{:.2f}'.format((2*a_scaled_low*a_err_scaled_low/G) / (M_o))
 
-    fitted_data_3= power_law(trimmerz(array, 100, np.inf)[:,0], param_3[0], param_3[1])
-    fitted_data_3 = np.hstack((np.vstack((trimmerz(array, 100, np.inf)[:,0])), np.vstack((fitted_data_3))))
+    # Fitted data
+    fitted_data = power_law(np.linspace(150,1350,40), param[0], param[1])
+    fitted_data = np.hstack((np.vstack((np.linspace(150,1350,40))), np.vstack((fitted_data))))
     
-    keplarian_3 = keplarian_fit(trimmerz(array, 200, np.inf)[:,0], params_k_3[0])
-    keplarian_3 = np.hstack((np.vstack((trimmerz(array, 200, np.inf)[:,0])), np.vstack((keplarian_3))))
-    print('Keplerian A: = ' + str(params_k_3[0]))
+    # Keplerian fit
+    keplarian = keplarian_fit(np.linspace(150,1350,40), params_k[0])
+    keplarian = np.hstack((np.vstack((np.linspace(150,1350,40))), np.vstack((keplarian))))
+    print('Keplerian A: = ' + str(params_k[0]))
     
-    title = 'CH3CN_K=' + str(k_number) +' Velocity_Curve.pdf'
-    output_path = OUT + title
+    # Upper bound
+    n_high = param_high[1]
+    n_err_high = np.sqrt(np.diag(cov_high))[1]
+    a_scaled_high = params_k_high[0] * 10**3 * au**0.5
+    a_err_scaled_high = np.sqrt(np.diag(covariance_k_high))[0] * 10**3 * au**0.5
+    mass_high = '{:.1f}'.format(a_scaled_high**2 / (G*M_o))
+    mass_err_high = '{:.3f}'.format((2*a_scaled_high*a_err_scaled_high/G) / (M_o))
     
-    if not 'v_off' in name.lower():
-        if m_lower == 0:
-            plt.title('CH$_{3}$CN: K=' + str(k_number) +' Velocity-Distance Curve')
-        else:
-            plt.title('CH$_{3}$CN: K=' + str(k_number) +' Ring-Averaged Velocity-Distance Curve')
+    m_low = float(mass_low)
+    m_high = float(mass_high)
+    print('Lower, Upper MASS: ',m_low,m_high)
+    print('Normal bound MASS = '+ str(mass) + ' +/- ' + str(mass_err) + '\n')
+    
+    # Calculating reduced-chi
+    chi_red = chi_calc(array, np.vstack((power_law(array[:,0], param[0], param[1]))))
+
+    if ring == 0:
+        plt.title('CH$_{3}$CN Velocity-Distance Curve', size=15)
     else:
-        if m_lower == 0:
-            plt.title('CH$_{3}$CN Velocity-Distance Curve')
-        else:
-            plt.title('CH$_{3}^{\:13}$CN Ring-Averaged Velocity-Distance Curve')
-            #np.savetxt('C:/Users/Christopher/onedrive/documents/4th_year_physics/mphys_project/S2/W4-6/Velocity_curve/CH3CN_ring-av.txt', array)
-        
-    plt.ylabel('Velocity, km/s')
-    plt.xlabel('Distance, AU')
-    
-    chi_red = chi_calc(array,fitted_data)
+        plt.title('CH$_{3}$CN Ring-Averaged Velocity-Distance Curve', size=15)
 
-    plt.errorbar(array[:,0], array[:,1]*1, yerr = array[:,3]*1/30, fmt='x',
-                markersize=6, alpha=0.5, elinewidth=1.5, capsize=3, label = 'Velocity Dispersion, $\sigma_{v}$')
+        
+    plt.ylabel('Velocity, km/s', size=13)
+    plt.xlabel('Distance, AU', size=13)
+
+    plt.errorbar(array[:,0], array[:,1], yerr = array[:,3]*1, fmt='x',
+                markersize=6, alpha=0.5, elinewidth=1.5, capsize=3, label = 'Velocity, $\sigma_{v}$')
     
-    plt.plot([],[],label =f'i = {inc}'+'$^{o}$,'+f' $\phi$ = 170'+'$^{o}$', alpha=0)
-    """
+    plt.plot([],[],label =f'i = {INCLINATION}'+'$^{o}$,'+f' $\phi$ = {POSITION_ANGLE}'+'$^{o}$', alpha=0)
+
     plt.plot(fitted_data[:,0], fitted_data[:,1], label ='n = ' + 
-            str('{:.2f}'.format(n)) +'$\pm$' +str('{:.2f}'.format(n_err)))
+            str('{:.2f}'.format(n)) +' $\pm$ ' +str('{:.2f}'.format(n_err)))
     
-    plt.plot(keplarian[:,0], keplarian[:,1], label = 'Keplarian fit:\nM = ' +
-             str(mass) + ' $\pm$ '+str(mass_err) + ' $M_{\odot}$', alpha=0)
-    """
-    #plt.plot([],[],alpha=0, label=' ')
-    plt.plot(fitted_data_2[:,0], fitted_data_2[:,1]*1, label ='n = ' + 
-            str('{:.2f}'.format(n_2)) +' $\pm$ ' +str('{:.2f}'.format(n_err_2*2.2)))
-    
-    plt.plot(keplarian_2[:,0], keplarian_2[:,1]*1, '--', label = 'Keplerian fit:' )#+
-           #  str(mass_2) + ' $\pm$ '+str(mass_err_2)+ ' $M_{\odot}$', alpha=0)
-    #plt.plot(fitted_data_3[:,0], fitted_data_3[:,1], label ='n = ' + 
-    #       str('{:.3f}'.format(n_3)) +'$\pm$' +str('{:.2f}'.format(n_err_3)))
-    
-    #plt.plot(keplarian_3[:,0], keplarian_3[:,1], label = 'Keplarian fit\nM = ' +
-    #         str(mass_3) + ' $\pm$ '+str(mass_err_3)+ ' $M_{\odot}$')
-    #print('Angular Velocity = ' + str(keplarian[:,1]/keplarian[:,0]))
-    if m_lower == 0:
-        plt.plot([],[], label = str('{:.1f}'.format(m_low))+ '$M_{\odot}$ < M < '+str(mass_3) + '$M_{\odot}$', alpha=0)
-    else:
-        plt.plot([],[], label = str('{:.1f}'.format(m_lower))+ '$M_{\odot}$ < M < '+str(m_higher) + '$M_{\odot}$', alpha=0)
-        #plt.plot([],[], label = str('5.6$M_{\odot}$ < M < 14.9$M_{\odot}$'), alpha=0)
-        
-    plt.plot([],[],label='$\chi^{2}_{red}$ = ' + str('{:.2f}'.format(chi_red)))
-    plt.legend(loc = 'upper right',borderaxespad=0.5, frameon=True, fontsize=12)
+    plt.plot(keplarian[:,0], keplarian[:,1], '--', label = 'Keplerian fit:' )
+
+    plt.plot([],[], label = str('{:.1f}'.format(m_low))+ '$M_{\odot}$ < M < '+str(mass_high) + '$M_{\odot}$', alpha=0)
+
+    plt.plot([],[],label='$\chi^{2}_{red}$ = '+str('{:.2g}'.format(chi_red)))
+    plt.legend(loc = 'upper right',borderaxespad=0.5, frameon=True, fontsize=13)
     plt.grid(True)
-    #plt.savefig(output_path,bbox_inches='tight')
-    #np.savetxt('Keplarian_data_k=7.csv',keplarian,delimiter='')
-    if not m_lower == 0:
-        #plt.savefig('Velocity-Distance_RingAv_XCLASS.pdf',bbox_inches='tight')
-        title2 = 'CH3CN_K=' + str(k_number) +'_RingAv_Velocity_Curve.pdf'
-        plt.savefig(title2,bbox_inches='tight')
-        
+
     plt.show()
-    return m_low, mass_3
+    return m_low, mass_high
 
 def n_PA(results_array, position_angle):
     
     results_array = np.array([results_array])
     
     flattened_results = results_array.reshape(-1, results_array.shape[-1])
-    #print(flattened_results)
     
     valid = (flattened_results[:,1] > -1 ) & (flattened_results[:,1] < 1)
     flattened_results = flattened_results[valid]
@@ -504,27 +463,23 @@ def n_PA(results_array, position_angle):
     n_values = flattened_results[:, 1]
     
     PA_values = np.rad2deg(flattened_results[:, 3])
-    #min_x_index = np.argmin(flattened_results[:, 0])
 
     # Extract the corresponding y-value
-    #min_PA = flattened_results[min_x_index, 3]
     min_epic = np.rad2deg(position_angle)
     y_vals = np.linspace(-0.6,max(flattened_results[:, 1]),2)
     x_vals = np.linspace(min_epic,min_epic,2)
-   # minerz_pa = flattened_results[min]
+
     # Create the plot
     plt.figure(figsize=(10, 6))
     plt.scatter(PA_values, n_values, color='blue')
     plt.plot(x_vals,y_vals,'--',color='red', alpha=0.5, label='$\phi$ = '+str(round(min_epic)))
-    #plt.plot(PA_values, n_values)
+
     plt.title('Power Law vs. Position Angle, K=7')
     plt.xlabel('Position Angle (PA)')
     plt.ylabel('Power Law Exponent (n)')
     plt.grid(True)
     plt.legend(loc = 'upper right',borderaxespad=0.5, frameon=True, fontsize=12)
-    #plt.savefig('Power_law_vs_PA_k=7.png', bbox_inches='tight',dpi=500)
     plt.show()
-    #plt.savefig('Power_law_vs_PA_k=7.png', bbox_inches='tight',dpi=500)
 
 def x_y_uncertainty(x, y, phi, phi_err):
     """
@@ -532,7 +487,7 @@ def x_y_uncertainty(x, y, phi, phi_err):
     y_flat = y.flatten()
     x_mesh, y_mesh = np.meshgrd(x_flat,y_flat)
     """
-    inc = np.deg2rad(34)
+    inc = np.deg2rad(INCLINATION)
     xp = x*np.cos(phi) + y*np.sin(phi)#*np.cos(inc)
     yp = -x*np.sin(phi) + y*np.cos(phi)#*np.cos(inc)
     r = np.sqrt(xp**2 + yp**2)
@@ -549,7 +504,7 @@ def x_y_uncertainty(x, y, phi, phi_err):
     xp_mesh, yp_mesh = np.meshgrid(xp_flat,yp_flat,indexing='ij')
     
     theta = np.arctan2(yp_mesh, xp_mesh)
-    ########################
+
     theta = (theta + 2 * np.pi) % (2 * np.pi)
     
     allowed_ranges = [(290, 360), (0, 70), (110, 250)]
@@ -565,52 +520,23 @@ def x_y_uncertainty(x, y, phi, phi_err):
     return r_err, r, theta_err, theta
 
 def velocity_uncertainty(v_obs, v_rad, i, theta, theta_err, i_err):
-    """
-    ################
+    
+    v_err = np.sqrt( ((V_RAD_ERR/v_rad)*v_obs)**2 + V_RAD_ERR**2 ) 
+    
     allowed_ranges = [(290, 360), (0, 70), (110, 250)]
-    
-    mask = np.zeros_like(theta, dtype=bool)
-    
-    # Set mask to True for angles within the allowed ranges
-    for low, high in allowed_ranges:
-        mask |= (theta >= low) & (theta <= high)
-    
-    v_obs = np.where(mask, v_obs, np.nan)
-    
-    # Calculate the rotational velocity, avoiding division by zero
-    sin_inclination = np.sin(i)
-    cos_theta = np.cos(theta)
-    
-    # Mask out the values where cos(theta) is zero (semi-minor axis)
-    cos_theta_masked = np.where(mask, cos_theta, np.nan)
-    
-    # Compute the rotational velocity
-    v_rot = v_obs / (sin_inclination * cos_theta_masked)
-    
-    # Replace nan and inf with zero after the calculation
-    #v_rot = np.nan_to_num(v_rot, nan=0.0, posinf=0.0, neginf=0.0)
-    
-    ##################
-    """
-    
-    #print(np.nanmax(theta))
-    #v_err = np.sqrt( ((0.236/v_rad)*v_obs)**2 + 0.236**2 )
-    v = (v_obs - v_rad)/(np.sin(i)*np.cos(theta))
-    v_err = np.sqrt( ((0.0707770409/v_rad)*v_obs)**2 + 0.0707770409**2 ) 
-    #v = (v_obs - v_rad)/(np.sin(i)*np.cos(theta))
+    theta = filter_theta(theta, allowed_ranges)
     
     v_r = np.abs(v_obs / (np.sin(i) * np.cos(theta)))
-    v_r_err = np.sqrt( (1/(np.sin(i)**2)*(((v_err**2 + (v*np.cos(i)*i_err)**2)) ))) #+ ((v*np.tan(theta)*theta_err)/(np.cos(theta)))**2))) 
-    
-    
-    #v_r = np.abs(v_obs / (np.sin(i) * np.cos(theta)))
-
+    v_r_err = np.sqrt( (1/(np.sin(i)**2)*(((v_err**2 + (v_r*np.cos(i)*i_err)**2)) )))
+                                #+ ((v_r*np.tan(theta)*theta_err)/(np.cos(theta)))**2 )))
     
     return v_r_err, v_r
 
 def galactic_coords(data, header):
-    
-    #header = data[0].header
+    """
+    Using the header file to convert x,y into AU from gal coords.
+
+    """
     
     ctype1 = header['CTYPE1']
     crval1 = header['CRVAL1']
@@ -633,6 +559,10 @@ def galactic_coords(data, header):
     return x_au,y_au
 
 def match_shapes_with_nan(data):
+    """
+    Match the shapes of the 2D array with NaNs to apply the coord trans.
+
+    """
     # Extract the shape of the 2D data array (ignoring the first singleton dimension)
     if data.ndim == 3:
         n, m = data.shape[1], data.shape[2]
@@ -691,23 +621,24 @@ def no_nan(data):
     temp = np.vstack(temp)
     std = np.std(temp[:,1])
     mean = np.mean(temp[:,1])
-    #print('Std = ' + str(std))
-    #print('Mean = ' + str(mean)) 
     
     temperz = []
     for lineo in temp:
-        if lineo[1] < (mean + 7*std):
+        if lineo[1] < (mean + 5*std): # Removes points 5 standard dev away
             temperz.append(lineo)
             
     return np.vstack((temperz))
 
 def trimming(array):
+    """
+    To trim the radial data-set to user-defined TRIM
+    """
     temp = []
     for line in array:
-        if not line[0] > 1750:
+        if not line[0] > TRIM:
             temp.append(line)
     
-    if not len(temp) ==0:
+    if not len(temp) ==0: # Remove r=0 to avoid undefined velocity
         temp=np.vstack(temp)
     return temp
 
@@ -716,7 +647,10 @@ def keplarian_fit(r,a):
     return a * r**-0.5
 
 def fitting_data(name, data, minimum):
-    
+    """
+    Curve fitting
+
+    """
     x = data[:,0] - minimum
     #print(x,data[:,1])
     params, covariance = curve_fit(name, x, data[:,1], #sigma = data[:,3],
@@ -741,6 +675,10 @@ def find_closest_n(results_array, target_n=-0.5):
     return closest_result
 
 def trimmerz(array, trim_1, trim_2):
+    """
+    Can trim data sets to only return data within two bounds.
+
+    """
     #trim_1 lower bound
     #trim_2 upper bound
     temp = []
@@ -760,7 +698,7 @@ def chi_calc(data,fit):
     chi = 0
     for i in pigs:
         if not data[i,3] == 0: 
-            chi += ( (data[i,1]-fit[i,1] )**2 / (data[i,3] / 18)**2)
+            chi += ( (data[i,1]-fit[i,0] )**2 / (data[i,3])**2)
         else:
             chi+=0
     
@@ -768,117 +706,5 @@ def chi_calc(data,fit):
     
     return chi_red
 
-def rotational_velocity_real(v_obs, x_trans, y_trans, inclination_deg=34, A_kep_SI=0):
-    # Generate meshgrid from the flattened transposed coordinates
-    x_mesh, y_mesh = np.meshgrid(x_trans, y_trans)
-    
-    # Calculate the radius r from the meshgrid
-    r = np.sqrt(x_mesh**2 + y_mesh**2)
-    
-    # Scale the observed velocity
-    v_obs_scaled = v_obs# - 29  # Assuming 29 is the systemic velocity to be subtracted
-    
-    # Calculate theta in radians from the meshgrid and convert to degrees
-    theta = np.rad2deg(np.arctan2(y_mesh, x_mesh))
-    
-    # Normalize theta to be within the range [0, 360)
-    theta = (theta + 360) % 360
-    
-    # Define the allowed ranges in degrees, excluding the semi-minor axis
-    allowed_ranges = [(0, 70), (115, 250), (295, 360)]
-    
-    # Initialize mask to include all angles
-    mask = np.zeros_like(theta, dtype=bool)
-    
-    # Set mask to True for angles within the allowed ranges
-    for low, high in allowed_ranges:
-        mask |= (theta >= low) & (theta <= high)
-    
-    # Apply the mask to v_obs, setting out-of-range values to np.nan
-    v_obs_masked = np.where(mask, v_obs_scaled, np.nan)
-    
-    # Calculate the Keplerian velocity for regions where the velocity is zero or masked
-    v_keplerian = A_kep_SI / np.sqrt(r)
-    v_obs_masked = np.where((v_obs_masked == 0) | np.isnan(v_obs_masked), v_keplerian, v_obs_masked)
-    
-    # Calculate the rotational velocity, avoiding division by zero
-    sin_inclination = np.sin(np.deg2rad(inclination_deg))
-    cos_theta = np.cos(np.deg2rad(theta))
-    
-    # Mask out the values where cos(theta) is zero (semi-minor axis)
-    cos_theta_masked = np.where(mask, cos_theta, np.nan)
-    
-    # Compute the rotational velocity
-    v_rot = v_obs_masked / (sin_inclination * cos_theta_masked)
-    
-    # Replace nan and inf with zero after the calculation
-    v_rot = np.nan_to_num(v_rot, nan=0.0, posinf=0.0, neginf=0.0)
-    """
-    # Plot the rotational velocity field
-    fig, ax = plt.subplots()
-    im = ax.imshow(v_rot, extent=[x_mesh.min(), x_mesh.max(), y_mesh.min(), y_mesh.max()], cmap='viridis')
-    ax.set_title('Rotational Velocity')
-    plt.colorbar(im)
-    plt.show()
-    """
-    return v_rot
-
-def rotational_velocity(v_obs_scaled, x_trans, y_trans, inclination_deg, numba):
-    # Generate meshgrid from the flattened transposed coordinates
-    x_mesh, y_mesh = np.meshgrid(x_trans, y_trans)
-    
-    # Calculate the radius r from the meshgrid
-    r = np.sqrt(x_mesh**2 + y_mesh**2)
-    
-    # Scale the observed velocity
-     # Assuming 29 is the systemic velocity to be subtracted
-    
-    # Calculate theta in radians from the meshgrid and convert to degrees
-    theta = np.rad2deg(np.arctan2(y_mesh, x_mesh))
-    
-    # Normalize theta to be within the range [0, 360)
-    theta = (theta + 360) % 360
-    
-    # Define the allowed ranges in degrees, excluding the semi-minor axis
-    allowed_ranges = [(0, 75), (110, 255), (285, 360)]
-    
-    # Initialize mask to include all angles
-    mask = np.zeros_like(theta, dtype=bool)
-    
-    # Set mask to True for angles within the allowed ranges
-    for low, high in allowed_ranges:
-        mask |= (theta >= low) & (theta <= high)
-    
-    # Apply the mask to v_obs, setting out-of-range values to np.nan
-    v_obs_masked = np.where(mask, v_obs_scaled, np.nan)
-    
-    # Calculate the Keplerian velocity for regions where the velocity is zero or masked
-    #v_keplerian = A_kep_SI / np.sqrt(r)
-    #v_obs_masked = np.where((v_obs_masked == 0) | np.isnan(v_obs_masked), v_keplerian, v_obs_masked)
-    
-    # Calculate the rotational velocity, avoiding division by zero
-    sin_inclination = np.sin((inclination_deg))
-    cos_theta = np.cos(np.deg2rad(theta))
-    
-    # Mask out the values where cos(theta) is zero (semi-minor axis)
-    cos_theta_masked = np.where(mask, cos_theta, np.nan)
-    
-    # Compute the rotational velocity
-    v_rot = v_obs_masked / (sin_inclination * cos_theta_masked)
-    
-    # Replace nan and inf with zero after the calculation
-    v_rot_matrix = np.nan_to_num(v_rot, nan=0.0, posinf=0.0, neginf=0.0)
-    
-    if numba == 1:
-        # Plot the rotational velocity field
-        fig, ax = plt.subplots()
-        im = ax.imshow(v_rot, extent=[x_mesh.min(), x_mesh.max(), y_mesh.min(), y_mesh.max()], cmap='viridis')
-        ax.set_title('Rotational Velocity')
-        plt.colorbar(im)
-        plt.show()
-    #print(np.nanmax(v_rot))
-    combined =  np.vstack((r.flatten(),np.abs(v_rot_matrix.flatten()))).T
-    
-    return v_rot_matrix, combined
 
 get_data()
